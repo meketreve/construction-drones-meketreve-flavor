@@ -104,6 +104,13 @@ local unit = {
         do_separation = true,
         path_resolution_modifier = 0,
     },
+    -- Since 2.1 steering is a per unit setting instead of a map setting.
+    steering = {
+        force_unit_fuzzy_goto_behavior = false,
+        -- Same values the 2.0 map settings used as defaults.
+        move = { radius = 3, separation_factor = 3, separation_force = 0.01 },
+        stay = { radius = 1.2, separation_factor = 1.2, separation_force = 0.005 },
+    },
     light = {
         { minimum_darkness = 0.3, intensity = 0.4, size = 10, color = { r = 1.0, g = 1.0, b = 1.0 } },
         {

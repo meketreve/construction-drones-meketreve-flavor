@@ -5,7 +5,8 @@
 This mods adds Construction drones and some supporting things.
 They are ground based robots available from the early game, and will help contruct things quick.
 
-Please note that the 2.0 support is still highly experimental.
+Please note that the support for Factorio 2.x is still highly experimental.
+Version 2.1.x of this mod requires Factorio 2.1, version 2.0.x is for Factorio 2.0.
 
 <https://mods.factorio.com/mod/Updated_Construction_Drones>
 

@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.1.0
+Date: 2026-09-19
+  Info:
+    - Updated for Factorio 2.1. This version no longer loads on Factorio 2.0.
+  Changes:
+    - Steering of the drones is now set on the drone prototype, since 2.1 removed the steering map setting.
+  Bugfixes:
+    - Fixed a crash when upgrading underground belts, caused by the removal of LuaEntity::neighbours in 2.1.
+    - Fixed the item icons over the drones not being offset above the drone.
+---------------------------------------------------------------------------------------------------
 Version: 2.0.4
 Date: 2024-11-29T00:03:47+01:00
   Bugfixes:

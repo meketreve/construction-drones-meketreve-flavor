@@ -1253,11 +1253,10 @@ update_drone_sticker = function(drone_data)
 
     insert(renderings, rendering.draw_sprite {
         sprite = "utility/entity_info_dark_background",
-        target = drone,
+        target = { entity = drone, offset = { 0, -0.5 } },
         surface = surface,
         forces = forces,
         only_in_alt_mode = true,
-        target_offset = { 0, -0.5 },
         x_scale = 0.5,
         y_scale = 0.5,
     })
@@ -1265,11 +1264,10 @@ update_drone_sticker = function(drone_data)
     if number == 1 then
         local attemptor = rendering.draw_sprite {
             sprite = "item/" .. contents[1].name,
-            target = drone,
+            target = { entity = drone, offset = { 0, -0.5 } },
             surface = surface,
             forces = forces,
             only_in_alt_mode = true,
-            target_offset = { 0, -0.5 },
             x_scale = 0.5,
             y_scale = 0.5,
         }
@@ -1283,11 +1281,10 @@ update_drone_sticker = function(drone_data)
         local offset = offsets[offset_index]
         insert(renderings, rendering.draw_sprite {
             sprite = "item/" .. item.name,
-            target = drone,
+            target = { entity = drone, offset = { -0.125 + offset[1], -0.5 + offset[2] } },
             surface = surface,
             forces = forces,
             only_in_alt_mode = true,
-            target_offset = { -0.125 + offset[1], -0.5 + offset[2] },
             x_scale = 0.25,
             y_scale = 0.25,
         })
@@ -1673,7 +1670,8 @@ local process_upgrade_command = function(drone_data)
     local original_name = target.name
     local entity_type = target.type
     local index = unique_index(target)
-    local neighbour = entity_type == "underground-belt" and target.neighbours
+    -- 2.1 split LuaEntity.neighbours into per type attributes
+    local neighbour = entity_type == "underground-belt" and target.underground_belt_neighbour
     local type = entity_type == "underground-belt" and target.belt_to_ground_type or
         (entity_type == "loader" or entity_type == "loader-1x1") and target.loader_type
     local position = target.position
@@ -2178,8 +2176,7 @@ end
 
 
 lib.on_init = function()
-    game.map_settings.steering.default.force_unit_fuzzy_goto_behavior = false
-    game.map_settings.steering.moving.force_unit_fuzzy_goto_behavior = false
+    -- Since 2.1 the steering settings live on the unit prototype, see the drone prototype.
     game.map_settings.path_finder.use_path_cache = false
     storage.construction_drone = storage.construction_drone or data
 
