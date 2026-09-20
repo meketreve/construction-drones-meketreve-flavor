@@ -45,4 +45,5 @@ This flavor picks it up from there:
 * Products no longer disappear when a drone upgrades an entity with a full inventory
 * Tighter steering, so the drones follow their path more closely
 
-See [LICENSE](LICENSE) for what the MIT license here does and does not cover.
+The MIT license in [LICENSE](LICENSE) covers the changes listed above. See [NOTICE](NOTICE) for what it does not
+cover.

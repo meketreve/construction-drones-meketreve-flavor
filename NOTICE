@@ -1,0 +1,12 @@
+Construction Drones - Meketreve flavor
+
+The MIT license in LICENSE covers the changes made in this fork, which are listed in the Credits section of
+readme.md.
+
+The mod this fork is based on was written by Klonan, forked by roy192 and repackaged for Factorio 2.0 by Tubbles:
+
+    https://github.com/Klonan/Construction_Drones
+    https://github.com/Tubbles/Construction_Drones
+
+None of those are published with a license, so those parts of the code, along with the graphics and the sounds,
+stay under the rights of their authors. Licensing the whole mod under MIT would need their permission.
