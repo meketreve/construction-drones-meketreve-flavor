@@ -60,9 +60,11 @@ local drone_pathfind_flags = {
     allow_destroy_friendly_entities = false,
     cache = false,
     low_priority = false,
-    prefer_straight_paths = true,
+    -- Straight paths make the drones take wide, lazy turns around obstacles, they are small enough to cut corners
+    prefer_straight_paths = false,
     no_break = true,
 }
+
 
 local drone_orders = {
     construct = 1,
@@ -355,18 +357,25 @@ local contents = function(entity)
 end
 
 
-local take_product_stacks = function(inventory, products)
+local take_product_stacks = function(inventory, products, surface, position, force)
     local insert = inventory.insert
-    local to_spill = {}
 
-    if products then
-        for _, product in pairs(products) do
-            local stack = stack_from_product(product)
-            if stack then
-                local leftover = stack.count - insert(stack)
-                if leftover > 0 then
-                    to_spill[stack.name] = (to_spill[stack.name] or 0) + leftover
-                end
+    if not products then
+        return
+    end
+
+    for _, product in pairs(products) do
+        local stack = stack_from_product(product)
+        if stack then
+            local leftover = stack.count - insert(stack)
+            if leftover > 0 then
+                -- The drone is full, so the rest goes on the ground, like the player mining it would
+                surface.spill_item_stack {
+                    position = position,
+                    stack = { name = stack.name, count = leftover },
+                    enable_looted = false,
+                    force = force,
+                }
             end
         end
     end
@@ -405,11 +414,61 @@ local get_drone_stack_capacity = function(force)
 end
 
 
-local get_build_item = function(prototype, player)
+-- Set from the runtime setting, 0 disables taking items from chests
+local chest_pickup_range = 0
+
+local chest_types = { "container", "logistic-container" }
+
+local chest_pickup_technology = names.technologies.chest_pickup
+
+-- Returns the closest chest of the players force holding the item, if there is any in range of the job
+local find_nearby_chest = function(player, item_name, count, surface, position)
+    if chest_pickup_range <= 0 then
+        return
+    end
+
+    local technology = player.force.technologies[chest_pickup_technology]
+    if not (technology and technology.researched) then
+        return
+    end
+
+    local candidates = {}
+    for k, chest in pairs(surface.find_entities_filtered {
+        type = chest_types,
+        position = position,
+        radius = chest_pickup_range,
+        force = player.force,
+    }) do
+        -- Requester and buffer chests hold items that the logistic network brought there for something else
+        local logistic_mode = chest.prototype.logistic_mode
+        local is_up_for_grabs = not (logistic_mode == "requester" or logistic_mode == "buffer")
+
+        if is_up_for_grabs and chest.get_item_count(item_name) >= count then
+            candidates[k] = chest
+        end
+    end
+
+    if not next(candidates) then
+        return
+    end
+
+    return surface.get_closest(position, candidates)
+end
+
+
+-- Returns the item to build with, and the chest to take it from, if it is not the player holding it
+local get_build_item = function(prototype, player, surface, position)
     local items = prototype.items_to_place_this
     for _, item in pairs(items) do
         if player.get_item_count(item.name) >= item.count or player.cheat_mode then
             return item
+        end
+    end
+
+    for _, item in pairs(items) do
+        local chest = find_nearby_chest(player, item.name, item.count, surface, position)
+        if chest then
+            return item, chest
         end
     end
 end
@@ -538,7 +597,7 @@ local check_ghost = function(entity, player)
     local surface = entity.surface
     local position = entity.position
 
-    local item = get_build_item(entity.ghost_prototype, player)
+    local item, source = get_build_item(entity.ghost_prototype, player, surface, position)
 
     -- print("Checking ghost "..entity.ghost_name..random())
 
@@ -578,7 +637,7 @@ local check_ghost = function(entity, player)
     local drone_data = {
         player = player,
         order = drone_orders.construct,
-        pickup = { stack = item },
+        pickup = { stack = item, source = source },
         target = target,
         entity_ghost_name = entity.ghost_name,
         item_used_to_place = item.name,
@@ -611,7 +670,7 @@ local check_upgrade = function(entity, player)
 
     local surface = entity.surface
     local force = entity.force
-    local item = get_build_item(upgrade_prototype, player)
+    local item, source = get_build_item(upgrade_prototype, player, surface, entity.position)
     if not item then
         return
     end
@@ -643,7 +702,7 @@ local check_upgrade = function(entity, player)
     local drone_data = {
         player = player,
         order = drone_orders.upgrade,
-        pickup = { stack = { name = item.name, count = count } },
+        pickup = { stack = { name = item.name, count = count }, source = source },
         target = target,
         extra_targets = extra_targets,
         upgrade_prototype = upgrade_prototype,
@@ -672,11 +731,16 @@ local check_proxy = function(entity, player)
 
     local position = entity.position
     for _, item in pairs(items) do
-        if player.get_item_count(item.name) > 0 or player.cheat_mode then
+        local source
+        if not (player.get_item_count(item.name) > 0 or player.cheat_mode) then
+            source = find_nearby_chest(player, item.name, 1, entity.surface, position)
+        end
+
+        if source or player.get_item_count(item.name) > 0 or player.cheat_mode then
             local drone_data = {
                 player = player,
                 order = drone_orders.request_proxy,
-                pickup = { stack = { name = item.name, count = item.count } },
+                pickup = { stack = { name = item.name, count = item.count }, source = source },
                 target = entity,
             }
             make_path_request(drone_data, player, entity)
@@ -693,15 +757,19 @@ local check_cliff_deconstruction = function(entity, player)
         return
     end
 
+    local source
     if player.get_item_count(cliff_destroying_item) == 0 and (not player.cheat_mode) then
-        return
+        source = find_nearby_chest(player, cliff_destroying_item, 1, entity.surface, entity.position)
+        if not source then
+            return
+        end
     end
 
     local drone_data = {
         player = player,
         order = drone_orders.cliff_deconstruct,
         target = entity,
-        pickup = { stack = { name = cliff_destroying_item, count = 1 } },
+        pickup = { stack = { name = cliff_destroying_item, count = 1 }, source = source },
     }
     make_path_request(drone_data, player, entity)
 
@@ -846,11 +914,22 @@ local check_repair = function(entity, player)
     end
 
     local repair_item
+    local source
     local repair_items = get_repair_items()
     for name, item in pairs(repair_items) do
         if player.get_item_count(name) > 0 or player.cheat_mode then
             repair_item = item
             break
+        end
+    end
+
+    if not repair_item then
+        for name, item in pairs(repair_items) do
+            source = find_nearby_chest(player, name, 1, entity.surface, entity.position)
+            if source then
+                repair_item = item
+                break
+            end
         end
     end
 
@@ -861,7 +940,7 @@ local check_repair = function(entity, player)
     local drone_data = {
         player = player,
         order = drone_orders.repair,
-        pickup = { stack = { name = repair_item.name, count = 1 } },
+        pickup = { stack = { name = repair_item.name, count = 1 }, source = source },
         target = entity,
     }
 
@@ -1302,8 +1381,21 @@ local process_pickup_command = function(drone_data)
         return cancel_drone_order(drone_data)
     end
 
-    if not move_to_player(drone_data, player) then
-        return
+    -- The items are either in a chest nearby, or in the players own inventory
+    local source = drone_data.pickup.source
+    if source then
+        if not source.valid then
+            -- print("The chest we were going to take from is gone")
+            return cancel_drone_order(drone_data)
+        end
+
+        if not move_to_order_target(drone_data, source) then
+            return
+        end
+    else
+        if not move_to_player(drone_data, player) then
+            return
+        end
     end
 
     -- print("Pickup chest in range, picking up item")
@@ -1311,7 +1403,7 @@ local process_pickup_command = function(drone_data)
     local stack = drone_data.pickup.stack
     local drone_inventory = get_drone_inventory(drone_data)
 
-    transfer_stack(drone_inventory, player, stack)
+    transfer_stack(drone_inventory, source or player, stack)
 
     update_drone_sticker(drone_data)
 
@@ -1675,13 +1767,14 @@ local process_upgrade_command = function(drone_data)
     local type = entity_type == "underground-belt" and target.belt_to_ground_type or
         (entity_type == "loader" or entity_type == "loader-1x1") and target.loader_type
     local position = target.position
+    local force = target.force
 
     surface.create_entity {
         name = prototype.name,
         position = position,
         direction = direction,
         fast_replace = true,
-        force = target.force,
+        force = force,
         spill = false,
         type = type or nil,
         raise_built = true,
@@ -1694,24 +1787,26 @@ local process_upgrade_command = function(drone_data)
     local drone_inventory = get_drone_inventory(drone_data)
     local products = get_prototype(original_name).mineable_properties.products
 
-    take_product_stacks(drone_inventory, products)
+    take_product_stacks(drone_inventory, products, surface, position, force)
 
     if neighbour and neighbour.valid and drone_inventory.get_item_count(drone_data.item_used_to_place) > 0 then
         -- print("Upgrading neighbour")
         local type = neighbour.type == "underground-belt" and neighbour.belt_to_ground_type
         local neighbour_index = unique_index(neighbour)
+        local neighbour_position = neighbour.position
+        local neighbour_force = neighbour.force
         surface.create_entity {
             name = prototype.name,
-            position = neighbour.position,
+            position = neighbour_position,
             direction = neighbour.direction,
             fast_replace = true,
-            force = neighbour.force,
+            force = neighbour_force,
             spill = false,
             type = type or nil,
             raise_built = true,
         }
         data.already_targeted[neighbour_index] = nil
-        take_product_stacks(drone_inventory, products)
+        take_product_stacks(drone_inventory, products, surface, neighbour_position, neighbour_force)
         drone_inventory.remove({ name = drone_data.item_used_to_place })
     end
 
@@ -2141,6 +2236,7 @@ end
 
 local on_runtime_mod_setting_changed = function()
     setup_search_offsets(settings.global["throttling"].value)
+    chest_pickup_range = settings.global["chest-pickup-range"].value
 end
 
 

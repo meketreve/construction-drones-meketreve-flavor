@@ -107,9 +107,10 @@ local unit = {
     -- Since 2.1 steering is a per unit setting instead of a map setting.
     steering = {
         force_unit_fuzzy_goto_behavior = false,
-        -- Same values the 2.0 map settings used as defaults.
-        move = { radius = 3, separation_factor = 3, separation_force = 0.01 },
-        stay = { radius = 1.2, separation_factor = 1.2, separation_force = 0.005 },
+        -- The 2.0 map settings defaults are biter sized, a drone that swerves that wide around its neighbours
+        -- cannot follow a path through a belt gap.
+        move = { radius = 1, separation_factor = 1.2, separation_force = 0.005 },
+        stay = { radius = 1, separation_factor = 1.2, separation_force = 0.005 },
     },
     light = {
         { minimum_darkness = 0.3, intensity = 0.4, size = 10, color = { r = 1.0, g = 1.0, b = 1.0 } },
@@ -286,4 +287,30 @@ attack_beam.action = {
     },
 }
 
-data:extend { unit, item, recipe, proxy_chest, build_beam, deconstruct_beam, pickup_beam, attack_beam }
+local chest_pickup_technology = {
+    type = "technology",
+    name = names.technologies.chest_pickup,
+    icon = path .. "construction_drone_technology.png",
+    icon_size = 150,
+    effects = {
+        { type = "nothing", effect_description = { "technology-effect." .. names.technologies.chest_pickup } },
+    },
+    prerequisites = { "electronics" },
+    unit = {
+        count = 50,
+        ingredients = { { "automation-science-pack", 1 } },
+        time = 15,
+    },
+}
+
+data:extend {
+    unit,
+    item,
+    recipe,
+    proxy_chest,
+    build_beam,
+    deconstruct_beam,
+    pickup_beam,
+    attack_beam,
+    chest_pickup_technology,
+}

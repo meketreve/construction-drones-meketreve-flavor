@@ -8,6 +8,10 @@ They are ground based robots available from the early game, and will help contru
 Please note that the support for Factorio 2.x is still highly experimental.
 Version 2.1.x of this mod requires Factorio 2.1, version 2.0.x is for Factorio 2.0.
 
+The drones take their items out of your inventory. After researching "Construction drone chest pickup" they also
+take them out of chests near the job, except requester and buffer chests, which hold items meant for something else.
+The range is a map setting, set it to 0 to keep the drones out of your chests.
+
 <https://mods.factorio.com/mod/Updated_Construction_Drones>
 
 ## Development

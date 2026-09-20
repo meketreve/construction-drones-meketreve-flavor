@@ -1,4 +1,17 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.1.1
+Date: 2026-09-19
+  Features:
+    - Added the "Construction drone chest pickup" technology. Once researched, drones take the items they need
+      out of nearby chests instead of only out of your own inventory.
+    - Added a setting for how far from a job the drones look for such a chest, 0 disables it entirely.
+  Changes:
+    - The drones steer tighter around each other, so they follow their path more closely.
+    - The drones no longer ask the pathfinder for straight paths, they are small enough to cut corners.
+  Bugfixes:
+    - Fixed items being deleted when a drone upgraded an entity while its own inventory was full. They are now
+      dropped on the ground instead.
+---------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 2026-09-19
   Info:

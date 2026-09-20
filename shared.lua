@@ -3,7 +3,10 @@ local data = {}
 
 data.units = { construction_drone = "Construction_Drone" }
 
-data.technologies = { construction_drone_system = "Construction Drone System" }
+data.technologies = {
+    construction_drone_system = "Construction Drone System",
+    chest_pickup = "construction-drone-chest-pickup",
+}
 
 data.entities = {
     logistic_beacon = "Logistic_Beacon",
