@@ -305,12 +305,66 @@ count_active_drones = function()
 end
 
 
+-- Garages whose area covers this position. Looked up rarely, the answer only changes when one is built or mined.
+get_garages_in_range = function(surface, position, force)
+    return surface.find_entities_filtered {
+        name = shared.entities.drone_garage,
+        position = position,
+        radius = shared.garage.radius,
+        force = force,
+    }
+end
+
+
+-- Each garage covering the player lends its own processing to the controller
+local garage_bonus_cache = {}
+local garage_bonus_interval = 120
+
+get_garage_bonus = function(player)
+    local index = player.index
+    local cached = garage_bonus_cache[index]
+    if cached and cached.tick + garage_bonus_interval > game.tick then
+        return cached.bonus
+    end
+
+    local bonus = 0
+    local character = player.character
+    if character and character.valid then
+        bonus = #get_garages_in_range(player.physical_surface, getPlayerPosition(player), player.force)
+            * shared.garage.drone_bonus
+    end
+
+    garage_bonus_cache[index] = { tick = game.tick, bonus = bonus }
+    return bonus
+end
+
+
 -- How many more drones this player may command right now
 get_drone_budget = function(player)
+    -- Without a controller nobody takes orders, garages or not
     local capacity = get_controller_capacity(player)
     if capacity <= 0 then
         return 0
     end
 
-    return capacity - (active_drone_counts[player.index] or 0)
+    return capacity + get_garage_bonus(player) - (active_drone_counts[player.index] or 0)
+end
+
+
+-- The closest garage that still has room, for a drone that wants to get rid of its cargo
+find_garage_for_dropoff = function(drone)
+    local garages = get_garages_in_range(drone.surface, drone.position, drone.force)
+    if #garages == 0 then
+        return
+    end
+
+    local closest = drone.surface.get_closest(drone.position, garages)
+    if not (closest and closest.valid) then
+        return
+    end
+
+    local inventory = closest.get_inventory(defines.inventory.chest)
+    if inventory and not inventory.is_full() then
+        return closest
+    end
 end

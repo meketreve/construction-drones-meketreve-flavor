@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.3.0
+Date: 2026-09-24
+  Features:
+    - Added the drone garage, unlocked by a technology behind radar. Each garage covering you commands five more
+      drones on top of your controller, and drones on their way back unload their cargo into a garage in range
+      instead of filling your pockets.
+---------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 2026-09-24
   Info:

@@ -4,6 +4,7 @@ require "data/units/units"
 require "data/hotkeys"
 require "data/shortcut"
 require "data/items/drone_controller"
+require "data/entities/drone_garage"
 
 local prereq = {"space-science-pack"}
 local ingredients = {}

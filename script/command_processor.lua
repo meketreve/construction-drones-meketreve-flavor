@@ -1070,6 +1070,24 @@ process_return_to_player_command = function(drone_data, force)
     -- Mark drone as returning so it can be redirected to new work
     drone_data.returning = true
 
+    -- A garage on the way is a closer place to leave the cargo than the player is
+    local drone = drone_data.entity
+    local cargo = get_drone_inventory(drone_data)
+    if not (drone_data.garage_is_full or cargo.is_empty()) then
+        local garage = find_garage_for_dropoff(drone)
+        if garage then
+            if not move_to_order_target(drone_data, garage) then return end
+
+            transfer_inventory(cargo, garage)
+            if not cargo.is_empty() then
+                -- It did not all fit, the player gets the rest
+                drone_data.garage_is_full = true
+            end
+
+            update_drone_sticker(drone_data)
+        end
+    end
+
     if not (force or move_to_player(drone_data, player)) then return end -- attempt to move to the player
 
     --Now that we're at the player (we think), check they still exist, they might have logged off

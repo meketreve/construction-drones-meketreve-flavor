@@ -250,6 +250,7 @@ cancel_drone_order = function(drone_data, on_removed)
     drone_data.dropoff = nil
     drone_data.order = nil
     drone_data.target = nil
+    drone_data.garage_is_full = nil
 
     if not find_a_player(drone_data) then
         return drone_wait(drone_data, random(30, 300))

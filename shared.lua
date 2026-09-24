@@ -41,6 +41,16 @@ data.spectral_collision_mask = { not_colliding_with_itself = true, colliding_wit
 
 data.entities = {
     construction_drone_proxy_chest = "Construction_Drone_Proxy_Chest",
+    drone_garage = "drone-garage",
+}
+
+data.technologies = { drone_garage = "drone-garage" }
+
+data.garage = {
+    -- How far from a garage its help reaches
+    radius = 32,
+    -- How many more drones you command while inside a garage area
+    drone_bonus = 5,
 }
 
 data.items = { drone_controller = "drone-controller" }
