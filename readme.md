@@ -39,6 +39,9 @@ three things:
 * drones on their way back unload their cargo into a garage in range instead of into your pockets
 * chests **wired to it** with red or green wire become places the drones may take items from
 * it shows that area on the ground while you hold a garage on the cursor, or select one already built
+* it shares drones with the other garages: one with work but no drones borrows from the closest garage that has
+  any, and every drone stows itself in whichever garage is closest to where it finished, so the crews drift
+  towards the work on their own
 * it looks for work in its own area and sends its own drones, so put drones inside it and the base keeps being
   built while you are somewhere else. Those drones come back to the garage, unload there and stow themselves
 

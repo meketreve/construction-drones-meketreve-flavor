@@ -152,7 +152,7 @@ can_player_spawn_drones = function(owner)
         return
     end
 
-    local current_item_count = get_available_drones(owner)
+    local current_item_count = get_spawnable_drones(owner)
 
     local count = current_item_count - (data.request_count[owner_key(owner)] or 0)
     return count > 0
@@ -164,7 +164,7 @@ check_player_jobs = function(owner)
     if not queue then return end
     local count = math.min(
             5,
-            get_available_drones(owner) - (data.request_count[owner_key(owner)] or 0),
+            get_spawnable_drones(owner) - (data.request_count[owner_key(owner)] or 0),
             get_drone_budget(owner)
     )
 

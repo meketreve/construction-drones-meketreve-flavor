@@ -25,6 +25,13 @@ end
 make_player_drone = function(owner)
     local spawn_position
     if is_garage(owner) then
+        -- Garages share their drones, so the one nearest with stock hands this one out
+        local source = find_drone_source_garage(owner)
+        if not source then
+            logs.debug("No garage in the network has a drone to send")
+            return
+        end
+        owner = source
         spawn_position = owner_spawn_position(owner)
     elseif not settings.global["remote-view-spawn"].value and (owner.controller_type == defines.controllers.remote) then
         -- Fallback to physical_position in remote view if remote-view-spawn is disabled
@@ -263,6 +270,7 @@ cancel_drone_order = function(drone_data, on_removed)
     drone_data.order = nil
     drone_data.target = nil
     drone_data.garage_is_full = nil
+    drone_data.home = nil
 
     if not find_a_player(drone_data) then
         return drone_wait(drone_data, random(30, 300))

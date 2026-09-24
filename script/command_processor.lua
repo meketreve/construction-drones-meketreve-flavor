@@ -1116,16 +1116,24 @@ process_return_to_player_command = function(drone_data, force)
         end
     end
 
-    -- A garage stays put, a player walks around, so they are approached differently
+    -- A garage stays put, a player walks around, so they are approached differently. Garages work as one, so the
+    -- drone reports to whichever is closest to where it finished, not to the one that sent it out.
+    local home = owner
     if is_garage(owner) then
-        if not (force or move_to_order_target(drone_data, owner)) then return end
+        home = drone_data.home
+        if not (home and home.valid) then
+            home = find_home_garage(drone, owner)
+            drone_data.home = home
+        end
+
+        if not (force or move_to_order_target(drone_data, home)) then return end
     else
         if not (force or move_to_player(drone_data, owner)) then return end
     end
 
     --Now that we are there, check the owner is still around, the player might have logged off
-    local container = owner_container(owner)
-    if not (owner.valid and container and container.valid) then
+    local container = owner_container(home)
+    if not (owner.valid and home.valid and container and container.valid) then
         cancel_drone_order(drone_data)
         return
     end

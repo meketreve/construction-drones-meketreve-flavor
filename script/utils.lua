@@ -637,3 +637,66 @@ refresh_garage_antennas = function()
         add_garage_antenna(garage)
     end
 end
+
+
+-- The closest garage of this force on this surface that the test accepts
+find_nearest_garage = function(surface, position, force, accept)
+    local best, best_distance
+
+    for _, garage in pairs(get_all_garages()) do
+        if garage.valid and garage.surface == surface and garage.force == force
+            and (not accept or accept(garage)) then
+            local dx = garage.position.x - position.x
+            local dy = garage.position.y - position.y
+            local squared = dx * dx + dy * dy
+            if not best_distance or squared < best_distance then
+                best, best_distance = garage, squared
+            end
+        end
+    end
+
+    return best, best_distance and best_distance ^ 0.5
+end
+
+
+-- Garages work as one: a drone reports to whichever one is closest to where it finished, not to the one it left
+-- from, so over time the drones end up where the work is.
+find_home_garage = function(drone, fallback)
+    if not (drone and drone.valid) then
+        return fallback
+    end
+
+    local home = find_nearest_garage(drone.surface, drone.position, drone.force, function(garage)
+        local inventory = garage.get_inventory(defines.inventory.chest)
+        return inventory and not inventory.is_full()
+    end)
+
+    return home or fallback
+end
+
+
+-- Which garage actually hands out the drone: its own if it has any, otherwise the closest one in the network
+find_drone_source_garage = function(garage)
+    if get_available_drones(garage) > 0 then
+        return garage
+    end
+
+    local lender, how_far = find_nearest_garage(garage.surface, garage.position, garage.force, function(other)
+        return other ~= garage and get_available_drones(other) > 0
+    end)
+
+    if lender and how_far <= shared.garage.network_distance then
+        return lender
+    end
+end
+
+
+-- How many drones this owner can still send out of an inventory it can reach
+get_spawnable_drones = function(owner)
+    if not is_garage(owner) then
+        return get_available_drones(owner)
+    end
+
+    local source = find_drone_source_garage(owner)
+    return source and get_available_drones(source) or 0
+end

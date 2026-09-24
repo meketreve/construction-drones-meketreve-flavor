@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.8.0
+Date: 2026-09-24
+  Features:
+    - Garages now work as one. A drone reports to whichever garage is closest to where it finished, not to the
+      one that sent it out, and a garage with work but no drones borrows one from the closest garage that has
+      any, up to 96 tiles away. Drones end up where the work is without being handed out one garage at a time.
+---------------------------------------------------------------------------------------------------
 Version: 1.7.1
 Date: 2026-09-24
   Features:

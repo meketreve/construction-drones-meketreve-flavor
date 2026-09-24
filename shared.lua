@@ -51,6 +51,8 @@ data.garage = {
     radius = 32,
     -- How many more drones you command while inside a garage area
     drone_bonus = 5,
+    -- How far apart two garages may be and still lend each other drones
+    network_distance = 96,
 }
 
 data.items = { drone_controller = "drone-controller" }
