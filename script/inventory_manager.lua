@@ -110,6 +110,8 @@ get_drone_stack_capacity = function()
     return drone_stack_capacity
 end
 
+-- Returns the item to build with, and where to pick it up: nil for the player, an entity for a chest wired to a
+-- garage covering the job.
 get_build_item = function(entity, player)
     local items
     local quality
@@ -129,6 +131,16 @@ get_build_item = function(entity, player)
             item.quality = quality
             logs.trace("found build item: " ..serpent.block(item))
             return item
+        end
+    end
+
+    -- Nothing in the player inventory, ask the garages what the chests around them are announcing
+    for _, item in pairs(items) do
+        local chest = find_wired_chest(player.force, entity.surface, entity.position, item.name, quality, item.count)
+        if chest then
+            item.quality = quality
+            logs.trace("found build item in a wired chest: " ..serpent.block(item))
+            return item, chest
         end
     end
 end

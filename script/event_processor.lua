@@ -15,6 +15,21 @@ remote.add_interface("construction_drone", {
     end,
     console = function(bool)
         use_console = bool
+    end,
+    -- Which chest a drone would be sent to for this item, if any. For debugging a wiring that does not work.
+    which_chest = function(force_name, surface_name, position, item_name, quality, count)
+        local chest = find_wired_chest(
+            game.forces[force_name],
+            game.surfaces[surface_name],
+            position,
+            item_name,
+            quality or "normal",
+            count or 1
+        )
+        if not chest then
+            return
+        end
+        return { name = chest.name, position = chest.position, unit_number = chest.unit_number }
     end
 })
 

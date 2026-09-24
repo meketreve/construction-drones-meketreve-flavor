@@ -368,3 +368,85 @@ find_garage_for_dropoff = function(drone)
         return closest
     end
 end
+
+
+local wire_connector_ids = { defines.wire_connector_id.circuit_red, defines.wire_connector_id.circuit_green }
+local chest_types = { "container", "logistic-container" }
+
+-- Chests wired to this garage, on either colour. Rebuilt every couple of seconds, since it only changes when
+-- somebody lays a wire or builds a chest.
+local wired_chest_cache = {}
+local wired_chest_interval = 120
+
+local get_wired_chests = function(garage, force)
+    local cached = wired_chest_cache[garage.unit_number]
+    if cached and cached.tick + wired_chest_interval > game.tick then
+        return cached.chests
+    end
+
+    local networks = {}
+    for _, connector_id in pairs(wire_connector_ids) do
+        local network = garage.get_circuit_network(connector_id)
+        if network then
+            networks[connector_id] = network.network_id
+        end
+    end
+
+    local chests = {}
+    if next(networks) then
+        for _, chest in pairs(garage.surface.find_entities_filtered {
+            type = chest_types,
+            position = garage.position,
+            radius = shared.garage.radius,
+            force = force,
+        }) do
+            for connector_id, network_id in pairs(networks) do
+                local chest_network = chest.get_circuit_network(connector_id)
+                if chest_network and chest_network.network_id == network_id then
+                    chests[#chests + 1] = chest
+                    break
+                end
+            end
+        end
+    end
+
+    wired_chest_cache[garage.unit_number] = { tick = game.tick, chests = chests }
+    return chests
+end
+
+
+-- A chest holds what it holds, but a drone only knows about the ones wired to a garage that covers the job.
+-- Returns the closest such chest holding the item, or nil, which means the player carries it or nobody does.
+find_wired_chest = function(force, surface, position, item_name, quality, count)
+    local quality_name = quality and (type(quality) == "string" and quality or quality.name) or "normal"
+    local wanted = { name = item_name, quality = quality_name }
+
+    local candidates = {}
+    for _, garage in pairs(get_garages_in_range(surface, position, force)) do
+        for _, chest in pairs(get_wired_chests(garage, force)) do
+            if chest.valid and chest.get_item_count(wanted) >= count then
+                candidates[chest.unit_number] = chest
+            end
+        end
+    end
+
+    if not next(candidates) then
+        return
+    end
+
+    return surface.get_closest(position, candidates)
+end
+
+
+-- Where the drone should pick the item up: nil means the player carries it, an entity means go there
+find_item_source = function(player, entity, item_name, quality, count)
+    if player.cheat_mode then
+        return
+    end
+
+    if player.get_item_count({ name = item_name, quality = quality }) >= count then
+        return
+    end
+
+    return find_wired_chest(player.force, entity.surface, entity.position, item_name, quality, count)
+end

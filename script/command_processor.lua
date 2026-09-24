@@ -4,7 +4,7 @@ check_ghost = function(entity, player)
     if not should_process_entity(entity, player, drone_orders.construct) then return end
     if data.already_targeted[entity.unit_number] then return end
 
-    local item = get_build_item(entity, player)
+    local item, source = get_build_item(entity, player)
 
     if not item then return end -- if the player doesn't have the required item, we can't continue
 
@@ -57,7 +57,7 @@ check_ghost = function(entity, player)
         local drone_data = {
             player = player,
             order = drone_orders.construct,
-            pickup = { stack = batch_item },
+            pickup = { stack = batch_item, source = source },
             target = target,
             entity_ghost_name = entity.ghost_name,
             item_to_place = batch_item,
@@ -82,7 +82,7 @@ check_upgrade = function(entity, player)
 
     local surface = entity.surface
 
-    local item = get_build_item(entity, player)
+    local item, source = get_build_item(entity, player)
     if not item then --[[game.print("no build item found")]] return end
 
     local count = 0
@@ -113,7 +113,7 @@ check_upgrade = function(entity, player)
     local drone_data = {
         player = player,
         order = drone_orders.upgrade,
-        pickup = { stack = { name = item.name, count = count, quality = upgrade_quality } },
+        pickup = { stack = { name = item.name, count = count, quality = upgrade_quality }, source = source },
         target = target,
         extra_targets = extra_targets,
         upgrade_prototype = upgrade_prototype,
@@ -145,11 +145,13 @@ check_proxy = function(entity, player)
     local items = entity.item_requests
 
     for _, item in pairs(items) do
-        if player.get_item_count({name = item.name, quality = item.quality}) > 0 or player.cheat_mode then
+        local source = find_item_source(player, entity, item.name, item.quality, 1)
+        if source or player.cheat_mode
+            or player.get_item_count({ name = item.name, quality = item.quality }) > 0 then
             local drone_data = {
                 player = player,
                 order = drone_orders.request_proxy,
-                pickup = { stack = item },
+                pickup = { stack = item, source = source },
                 target = entity,
             }
             make_path_request(drone_data, player, entity)
@@ -165,7 +167,8 @@ check_cliff_deconstruction = function(entity, player)
         return
     end
 
-    if (not player.cheat_mode) and player.get_item_count(cliff_destroying_item) == 0  then
+    local source = find_item_source(player, entity, cliff_destroying_item, "normal", 1)
+    if (not player.cheat_mode) and not source and player.get_item_count(cliff_destroying_item) == 0 then
         return
     end
 
@@ -173,7 +176,7 @@ check_cliff_deconstruction = function(entity, player)
         player = player,
         order = drone_orders.cliff_deconstruct,
         target = entity,
-        pickup = { stack = { name = cliff_destroying_item, count = 1 } },
+        pickup = { stack = { name = cliff_destroying_item, count = 1 }, source = source },
     }
     make_path_request(drone_data, player, entity)
 
@@ -298,10 +301,21 @@ check_repair = function(entity, player)
 
     local repair_tools = get_repair_items()
     local repair_item
+    local source
     for name, _ in pairs(repair_tools) do
         if player.cheat_mode or player.get_item_count(name) > 0 then
             repair_item = { name = name, count = 1 } -- Explicitly set count to 1
             break
+        end
+    end
+
+    if not repair_item then
+        for name, _ in pairs(repair_tools) do
+            source = find_item_source(player, entity, name, "normal", 1)
+            if source then
+                repair_item = { name = name, count = 1 }
+                break
+            end
         end
     end
 
@@ -310,7 +324,7 @@ check_repair = function(entity, player)
     local drone_data = {
         player = player,
         order = drone_orders.repair,
-        pickup = { stack = repair_item }, -- Pickup only one repair item
+        pickup = { stack = repair_item, source = source }, -- Pickup only one repair item
         target = entity,
     }
 
@@ -358,12 +372,25 @@ process_pickup_command = function(drone_data)
         return cancel_drone_order(drone_data)
     end
 
+    -- A chest wired to a garage, or the player, who is right here since the drone spawned on them
+    local source = drone_data.pickup.source
+    if source then
+        if not source.valid then
+            logs.debug("the chest we were sent to is gone")
+            return cancel_drone_order(drone_data)
+        end
+
+        if not move_to_order_target(drone_data, source) then return end
+    elseif not (player.character and player.character.valid) then
+        return cancel_drone_order(drone_data)
+    end
+
     local stack = drone_data.pickup.stack
     logs.trace("Picking up stack: " ..serpent.block(stack))
     local drone_inventory = get_drone_inventory(drone_data)
     logs.debug("starting stack transfer to drone")
 
-    transfer_stack(drone_inventory, player.character, stack)
+    transfer_stack(drone_inventory, source or player.character, stack)
 
 
     update_drone_sticker(drone_data)

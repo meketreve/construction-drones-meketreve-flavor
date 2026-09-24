@@ -23,6 +23,23 @@ In `.vscode/cheats` there are some useful cheats for testing the mod.
 To make a release, ALWAYS TEST FIRST, then make a git tag and push it. Go to the github page for it and download the
 tag as a zip. Upload it to mod portal.
 
+## Drone controller and garage
+
+The drones take their orders from a **drone controller**. It is a gun, so it goes in a weapon slot, which the
+character has from the start, and each controller you carry commands a few drones at the same time, more if it is
+of a higher quality. Without one in a weapon slot, the drones sit still.
+
+The **drone garage** is unlocked by a technology behind radar, and does three things:
+
+* it commands five more drones while its area covers you, so building several is how you get a bigger swarm
+* drones on their way back unload their cargo into a garage in range instead of into your pockets
+* chests **wired to it** with red or green wire become places the drones may take items from
+
+That last one is the point of the wire: a chest announces its contents on the circuit network, the garage listens,
+and only then do the drones know the items are there. A chest nobody wired is invisible to them, and so is a wired
+chest that sits outside the area of every garage. Requester and buffer chests are read like any other chest, so
+wire those only if you want the drones helping themselves to what the logistic network brought.
+
 ## Credits
 
 This mod has been passed along a chain of forks:
