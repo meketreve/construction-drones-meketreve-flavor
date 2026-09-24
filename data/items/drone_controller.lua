@@ -24,7 +24,8 @@ local gun = {
 local recipe = {
     type = "recipe",
     name = name,
-    enabled = true,
+    -- unlocked by electronics, see data-final-fixes
+    enabled = false,
     energy_required = 2,
     ingredients = {
         { type = "item", name = "electronic-circuit", amount = 10 },

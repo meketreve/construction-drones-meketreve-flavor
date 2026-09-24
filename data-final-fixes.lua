@@ -46,3 +46,20 @@ for _, prototype in pairs(collision_mask_util.collect_prototypes_with_layer("pla
         ::continue::
     end
 end
+
+
+-- The drones and their controller both need electronic circuits, so they show up with the technology that teaches
+-- them. If some mod removed that technology, they are craftable from the start instead.
+local unlocked_by_electronics = { shared.units.construction_drone, shared.items.drone_controller }
+local electronics = data.raw.technology["electronics"]
+
+for _, recipe_name in pairs(unlocked_by_electronics) do
+    local recipe = data.raw.recipe[recipe_name]
+    if recipe then
+        if electronics then
+            table.insert(electronics.effects, { type = "unlock-recipe", recipe = recipe_name })
+        else
+            recipe.enabled = true
+        end
+    end
+end

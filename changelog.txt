@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.6.0
+Date: 2026-09-24
+  Changes:
+    - The drones and the drone controller are now unlocked by the electronics technology, which is what teaches
+      the electronic circuits both of them are made of.
+    - New games no longer start with ten drones in the inventory.
+---------------------------------------------------------------------------------------------------
 Version: 1.5.0
 Date: 2026-09-24
   Features:

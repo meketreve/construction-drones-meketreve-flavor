@@ -157,7 +157,8 @@ local recipe = {
     name = name,
     category = data.raw.recipe["construction-robot"].category,
     auto_recycle = false,
-    enabled = true,
+    -- unlocked by electronics, see data-final-fixes
+    enabled = false,
     ingredients = {
         { type="item", name="iron-plate", amount = 5 },
         { type="item", name="iron-gear-wheel", amount = 5 },

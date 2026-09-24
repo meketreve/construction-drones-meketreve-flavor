@@ -9,4 +9,3 @@ require("script/utils")
 require("script/globals")
 
 handler.add_lib(require("script/event_processor"))  -- Registers event handlers and mod lifecycle functions
-handler.add_lib(require("script/freeplay_interface"))  -- Registers on_init for freeplay starting items

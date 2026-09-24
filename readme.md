@@ -25,6 +25,9 @@ tag as a zip. Upload it to mod portal.
 
 ## Drone controller and garage
 
+The drones and their controller are unlocked by the **electronics** technology, the one that teaches the
+electronic circuits they are made of.
+
 The drones take their orders from a **drone controller**. It is a gun, so it goes in a weapon slot, which the
 character has from the start, and each controller you carry commands a few drones at the same time, more if it is
 of a higher quality. Without one in a weapon slot, the drones sit still.
