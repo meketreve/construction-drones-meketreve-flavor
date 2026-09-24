@@ -34,6 +34,8 @@ The **drone garage** is unlocked by a technology behind radar, and does three th
 * it commands five more drones while its area covers you, so building several is how you get a bigger swarm
 * drones on their way back unload their cargo into a garage in range instead of into your pockets
 * chests **wired to it** with red or green wire become places the drones may take items from
+* it looks for work in its own area and sends its own drones, so put drones inside it and the base keeps being
+  built while you are somewhere else. Those drones come back to the garage, unload there and stow themselves
 
 That last one is the point of the wire: a chest announces its contents on the circuit network, the garage listens,
 and only then do the drones know the items are there. A chest nobody wired is invisible to them, and so is a wired

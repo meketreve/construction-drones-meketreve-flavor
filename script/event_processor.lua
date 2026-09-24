@@ -16,6 +16,25 @@ remote.add_interface("construction_drone", {
     console = function(bool)
         use_console = bool
     end,
+    -- What the garages are doing: how many there are, what they have queued and how many drones they may send.
+    garage_state = function()
+        local report = {}
+        for _, garage in pairs(get_all_garages()) do
+            local key = owner_key(garage)
+            local queue = data.job_queue[key] or {}
+            local queued = 0
+            for _ in pairs(queue) do queued = queued + 1 end
+            report[#report + 1] = {
+                key = key,
+                position = garage.position,
+                drones = get_available_drones(garage),
+                budget = get_drone_budget(garage),
+                queued = queued,
+                requested = data.request_count[key] or 0,
+            }
+        end
+        return { garages = report, searches = table_size(data.search_queue) }
+    end,
     -- Which chest a drone would be sent to for this item, if any. For debugging a wiring that does not work.
     which_chest = function(force_name, surface_name, position, item_name, quality, count)
         local chest = find_wired_chest(
@@ -50,26 +69,30 @@ local function compute_search_offsets(div)
     return offsets
 end
 
-scan_for_nearby_jobs = function(player, area)
+scan_for_nearby_jobs = function(owner, area)
     local job_queue = data.job_queue
-    local player_index = player.index
-    if not player.connected then
-        job_queue[player_index] = nil
-        return
+    local key = owner_key(owner)
+
+    if not is_garage(owner) then
+        if not owner.connected then
+            job_queue[key] = nil
+            return
+        end
+
+        if not owner.is_shortcut_toggled("construction-drone-toggle") then
+            job_queue[key] = nil
+            return
+        end
     end
 
-    if not player.is_shortcut_toggled("construction-drone-toggle") then
-        job_queue[player_index] = nil
-        return
-    end
-    local player_queue = job_queue[player_index]
+    local player_queue = job_queue[key]
     if not player_queue then
         player_queue = {}
-        job_queue[player_index] = player_queue
+        job_queue[key] = player_queue
     end
     local already_targeted = data.already_targeted
 
-    local entities = player.physical_surface.find_entities_filtered { area = area, type = ignored_types, invert = true }
+    local entities = owner_surface(owner).find_entities_filtered { area = area, type = ignored_types, invert = true }
 
     local unique_index = unique_index
     local check_entity = function(entity)
@@ -88,7 +111,7 @@ scan_for_nearby_jobs = function(player, area)
 
         if entity.to_be_deconstructed() then
             player_queue[index] = { type = drone_orders.deconstruct, entity = entity }
-            return truee
+            return true
         end
 
         if (entity.get_health_ratio() or 1) < 1 then
@@ -107,48 +130,48 @@ scan_for_nearby_jobs = function(player, area)
     end
 end
 
-get_available_drones = function(player)
+get_available_drones = function(owner)
     local drone_count = 0
     if script.active_mods["quality"] then
         for quality, _ in pairs(unit_data.drone_quality) do
-            drone_count = drone_count + player.get_item_count({name = shared.units.construction_drone, quality = quality})
+            drone_count = drone_count + owner_item_count(owner, {name = shared.units.construction_drone, quality = quality})
         end
     else
-        drone_count = player.get_item_count({name = shared.units.construction_drone})
+        drone_count = owner_item_count(owner, {name = shared.units.construction_drone})
     end
     return drone_count
 end
 
-can_player_spawn_drones = function(player)
-    if not player.is_shortcut_toggled("construction-drone-toggle") then
+can_player_spawn_drones = function(owner)
+    if not is_garage(owner) and not owner.is_shortcut_toggled("construction-drone-toggle") then
         return
     end
 
     -- No controller in a weapon slot, no one to give the orders
-    if get_drone_budget(player) <= 0 then
+    if get_drone_budget(owner) <= 0 then
         return
     end
 
-    local current_item_count = get_available_drones(player)
+    local current_item_count = get_available_drones(owner)
 
-    local count = current_item_count - (data.request_count[player.index] or 0)
+    local count = current_item_count - (data.request_count[owner_key(owner)] or 0)
     return count > 0
 end
 
-check_player_jobs = function(player)
-    if not can_player_spawn_drones(player) then return end
-    local queue = data.job_queue[player.index]
+check_player_jobs = function(owner)
+    if not can_player_spawn_drones(owner) then return end
+    local queue = data.job_queue[owner_key(owner)]
     if not queue then return end
     local count = math.min(
             5,
-            get_available_drones(player) - (data.request_count[player.index] or 0),
-            get_drone_budget(player)
+            get_available_drones(owner) - (data.request_count[owner_key(owner)] or 0),
+            get_drone_budget(owner)
     )
 
     for _ = 1, count do
         local index, job = next(queue)
         if not index then return end
-        check_job(player, job)
+        check_job(owner, job)
         queue[index] = nil
     end
 end
@@ -162,20 +185,29 @@ check_search_queue = function()
     local index, search_data = next(data.search_queue)
     if not index then return end
     data.search_queue[index] = nil
-    local player_index = search_data.player_index
-    local player = game.get_player(player_index)
-    if not player then return end
+
+    local owner
+    if search_data.garage then
+        owner = search_data.garage
+        if not owner.valid then return end
+    else
+        owner = game.get_player(search_data.player_index)
+        if not owner then return end
+    end
+
     local area_index = search_data.area_index
     local area = search_offsets[area_index]
     if not area then return end
-    local force_player_position = settings.global["force-player-position-search"].value
+
     local position
-    if force_player_position then
+    if is_garage(owner) then
+        position = owner.position
+    elseif settings.global["force-player-position-search"].value then
         -- Use physical_position to clamp search area to player's character location, not remote view
-        position = player.physical_position
+        position = owner.physical_position
     else
         -- Use position for remote view or default player position
-        position = player.position
+        position = owner.position
     end
     -- Define search area centered on the chosen position
     local search_area = {
@@ -183,7 +215,7 @@ check_search_queue = function()
         { area[2][1] + position.x, area[2][2] + position.y },
     }
     -- Scan for jobs in the defined search area
-    scan_for_nearby_jobs(player, search_area)
+    scan_for_nearby_jobs(owner, search_area)
 end
 
 schedule_new_searches = function(event_tick)
@@ -196,9 +228,21 @@ schedule_new_searches = function(event_tick)
 
     for k, player in pairs(game.connected_players) do
         local index = player.index
-        if can_player_spawn_drones(player) and not next(data.job_queue[index] or {}) then
+        if can_player_spawn_drones(player) and not next(data.job_queue[owner_key(player)] or {}) then
             for i, _ in pairs(search_offsets) do
                 insert(queue, { player_index = index, area_index = i })
+            end
+        end
+    end
+
+    -- Garages look around themselves, which is how the drones work with nobody nearby
+    for _, garage in pairs(get_all_garages()) do
+        if can_player_spawn_drones(garage) and not next(data.job_queue[owner_key(garage)] or {}) then
+            for i, area in pairs(search_offsets) do
+                -- Only the areas that fall inside the garage own radius
+                if distance(area[1], { 0, 0 }) <= shared.garage.radius then
+                    insert(queue, { garage = garage, area_index = i })
+                end
             end
         end
     end
@@ -211,6 +255,10 @@ on_tick = function(event)
 
     for _, player in pairs(game.connected_players) do
         check_player_jobs(player)
+    end
+
+    for _, garage in pairs(get_all_garages()) do
+        check_player_jobs(garage)
     end
 
     schedule_new_searches(event.tick)
@@ -310,15 +358,15 @@ on_script_path_request_finished = function(event)
     if not drone_data then return end
     data.path_requests[event.id] = nil
 
-    local player = drone_data.player
-    if not (player and player.valid) then
+    local owner = drone_data.owner
+    if not (owner and owner.valid) then
         clear_target(drone_data)
         clear_extra_targets(drone_data)
         return
     end
 
-    local index = player.index
-    data.request_count[index] = (data.request_count[index] or 0) - 1
+    local key = owner_key(owner)
+    data.request_count[key] = (data.request_count[key] or 0) - 1
 
     if not event.path then
         logs.debug("Path request failed, clearing target")
@@ -336,7 +384,7 @@ on_script_path_request_finished = function(event)
     end
 
     drone_data.retry_count = 0  -- Reset on success
-    local drone = make_player_drone(player)
+    local drone = make_player_drone(owner)
     if not drone then
         logs.debug("Could not create drone")
         clear_target(drone_data)
@@ -353,7 +401,7 @@ on_construction_drone_toggle = function(event)
     if not enabled then
         -- Toggle OFF: force drones to return (they can be redirected if toggled back on)
         return_player_drones(player)
-        data.job_queue[event.player_index] = nil
+        data.job_queue[owner_key(player)] = nil
     else
         -- Toggle ON: redirect any returning drones to nearby work
         redirect_all_returning_drones(player)
@@ -369,7 +417,7 @@ on_drone_repair_toggle = function(event)
     local enabled = not player.is_shortcut_toggled("drone-repair-toggle")
     player.set_shortcut_toggled("drone-repair-toggle", enabled)
     if not enabled then
-        data.job_queue[event.player_index] = nil
+        data.job_queue[owner_key(player)] = nil
     end
 end
 
@@ -391,7 +439,7 @@ end
 on_player_left_game = function(event)
     local player = game.get_player(event.player_index)
     cancel_player_drone_orders(player)
-    data.job_queue[event.player_index] = nil
+    data.job_queue[owner_key(player)] = nil
 end
 
 prune_commands = function()
@@ -482,6 +530,19 @@ lib.on_configuration_changed = function()
     data.path_requests = data.path_requests or {}
     data.request_count = data.request_count or {}
     data.parked_drones = data.parked_drones or {}
+
+    -- Drones used to answer to a player, now they answer to an owner, which may also be a garage. The queues and
+    -- the counters moved from a player index to an owner key along with it.
+    for _, drone_data in pairs(data.drone_commands) do
+        if drone_data.player and not drone_data.owner then
+            drone_data.owner = drone_data.player
+            drone_data.player = nil
+        end
+    end
+    data.job_queue = {}
+    data.request_count = {}
+    data.search_queue = {}
+
     prune_commands()
 
     if not data.set_default_shortcut then

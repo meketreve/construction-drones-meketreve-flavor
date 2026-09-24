@@ -112,7 +112,7 @@ end
 
 -- Returns the item to build with, and where to pick it up: nil for the player, an entity for a chest wired to a
 -- garage covering the job.
-get_build_item = function(entity, player)
+get_build_item = function(entity, owner)
     local items
     local quality
 
@@ -126,7 +126,7 @@ get_build_item = function(entity, player)
     end
 
     for _, item in pairs(items) do
-        if player.cheat_mode or player.get_item_count({ name = item.name, quality = quality }) >= item.count
+        if owner_cheat_mode(owner) or owner_item_count(owner, { name = item.name, quality = quality }) >= item.count
         then
             item.quality = quality
             logs.trace("found build item: " ..serpent.block(item))
@@ -134,9 +134,9 @@ get_build_item = function(entity, player)
         end
     end
 
-    -- Nothing in the player inventory, ask the garages what the chests around them are announcing
+    -- Nothing in the owner inventory, ask the garages what the chests around them are announcing
     for _, item in pairs(items) do
-        local chest = find_wired_chest(player.force, entity.surface, entity.position, item.name, quality, item.count)
+        local chest = find_wired_chest(owner_force(owner), entity.surface, entity.position, item.name, quality, item.count)
         if chest then
             item.quality = quality
             logs.trace("found build item in a wired chest: " ..serpent.block(item))

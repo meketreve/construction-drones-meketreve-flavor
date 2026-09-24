@@ -1,10 +1,10 @@
 local random = math.random
-check_ghost = function(entity, player)
+check_ghost = function(entity, owner)
     if not (entity and entity.valid) then return end
-    if not should_process_entity(entity, player, drone_orders.construct) then return end
+    if not should_process_entity(entity, owner, drone_orders.construct) then return end
     if data.already_targeted[entity.unit_number] then return end
 
-    local item, source = get_build_item(entity, player)
+    local item, source = get_build_item(entity, owner)
 
     if not item then return end -- if the player doesn't have the required item, we can't continue
 
@@ -22,7 +22,7 @@ check_ghost = function(entity, player)
     for _, ghost in pairs(extra) do
         local unit_number = ghost.unit_number
         local should_check = not data.already_targeted[unit_number]
-        if should_check and should_process_entity(entity, player, drone_orders.construct) then
+        if should_check and should_process_entity(entity, owner, drone_orders.construct) then
             if ghost.ghost_name == entity.ghost_name and ghost.quality == entity.quality then
                 data.already_targeted[unit_number] = true
                 table.insert(all_targets, ghost)
@@ -55,7 +55,7 @@ check_ghost = function(entity, player)
 
         local batch_item = { name = item.name, count = origCount * batch_count, quality = item.quality }
         local drone_data = {
-            player = player,
+            owner = owner,
             order = drone_orders.construct,
             pickup = { stack = batch_item, source = source },
             target = target,
@@ -65,13 +65,13 @@ check_ghost = function(entity, player)
             extra_targets = batch_extra,
         }
 
-        make_path_request(drone_data, player, target)
+        make_path_request(drone_data, owner, target)
     end
 end
 
-check_upgrade = function(entity, player)
+check_upgrade = function(entity, owner)
     if not (entity and entity.valid) then return end
-    if not should_process_entity(entity, player, drone_orders.upgrade) then return end
+    if not should_process_entity(entity, owner, drone_orders.upgrade) then return end
     if not entity.to_be_upgraded() then return end
 
     local index = unique_index(entity)
@@ -82,7 +82,7 @@ check_upgrade = function(entity, player)
 
     local surface = entity.surface
 
-    local item, source = get_build_item(entity, player)
+    local item, source = get_build_item(entity, owner)
     if not item then --[[game.print("no build item found")]] return end
 
     local count = 0
@@ -99,19 +99,19 @@ check_upgrade = function(entity, player)
         end
         local nearby_index = nearby.unit_number
         local should_check = not data.already_targeted[nearby_index]
-        if should_check and should_process_entity(entity, player, drone_orders.upgrade) then
+        if should_check and should_process_entity(entity, owner, drone_orders.upgrade) then
             data.already_targeted[nearby_index] = true
             extra_targets[nearby_index] = nearby
             count = count + 1
         end
     end
 
-    local target = surface.get_closest(player.position, extra_targets)
+    local target = surface.get_closest(owner_position(owner), extra_targets)
     extra_targets[target.unit_number] = nil
     --game.print("Adding " .. count .. " to stack "..item.name .." with quality " .. upgrade_quality.level)
     item.quality = upgrade_quality
     local drone_data = {
-        player = player,
+        owner = owner,
         order = drone_orders.upgrade,
         pickup = { stack = { name = item.name, count = count, quality = upgrade_quality }, source = source },
         target = target,
@@ -121,15 +121,15 @@ check_upgrade = function(entity, player)
     }
     --inspect_item_properties("upgrade pickup", drone_data.pickup)
     --game.print("dispatching drone")
-    make_path_request(drone_data, player, target)
+    make_path_request(drone_data, owner, target)
 end
 
-check_proxy = function(entity, player)
+check_proxy = function(entity, owner)
     if not (entity and entity.valid) then
         return
     end
 
-    if not should_process_entity(entity, player, drone_orders.request_proxy) then
+    if not should_process_entity(entity, owner, drone_orders.request_proxy) then
         return
     end
 
@@ -145,58 +145,58 @@ check_proxy = function(entity, player)
     local items = entity.item_requests
 
     for _, item in pairs(items) do
-        local source = find_item_source(player, entity, item.name, item.quality, 1)
-        if source or player.cheat_mode
-            or player.get_item_count({ name = item.name, quality = item.quality }) > 0 then
+        local source = find_item_source(owner, entity, item.name, item.quality, 1)
+        if source or owner_cheat_mode(owner)
+            or owner_item_count(owner, { name = item.name, quality = item.quality }) > 0 then
             local drone_data = {
-                player = player,
+                owner = owner,
                 order = drone_orders.request_proxy,
                 pickup = { stack = item, source = source },
                 target = entity,
             }
-            make_path_request(drone_data, player, entity)
+            make_path_request(drone_data, owner, entity)
         end
     end
 
     data.already_targeted[unique_index(entity)] = true
 end
 
-check_cliff_deconstruction = function(entity, player)
+check_cliff_deconstruction = function(entity, owner)
     local cliff_destroying_item = entity.prototype.cliff_explosive_prototype
     if not cliff_destroying_item then
         return
     end
 
-    local source = find_item_source(player, entity, cliff_destroying_item, "normal", 1)
-    if (not player.cheat_mode) and not source and player.get_item_count(cliff_destroying_item) == 0 then
+    local source = find_item_source(owner, entity, cliff_destroying_item, "normal", 1)
+    if (not owner_cheat_mode(owner)) and not source and owner_item_count(owner, cliff_destroying_item) == 0 then
         return
     end
 
     local drone_data = {
-        player = player,
+        owner = owner,
         order = drone_orders.cliff_deconstruct,
         target = entity,
         pickup = { stack = { name = cliff_destroying_item, count = 1 }, source = source },
     }
-    make_path_request(drone_data, player, entity)
+    make_path_request(drone_data, owner, entity)
 
     data.already_targeted[unique_index(entity)] = true
 end
 
-check_deconstruction = function(entity, player)
+check_deconstruction = function(entity, owner)
     if not (entity and entity.valid) then return end
-    if not should_process_entity(entity, player, drone_orders.deconstruct) then return end
+    if not should_process_entity(entity, owner, drone_orders.deconstruct) then return end
     if not entity.to_be_deconstructed() then return end
 
     local index = unique_index(entity)
     if data.already_targeted[index] then return end
 
-    local force = player.force
+    local force = owner_force(owner)
 
     if not (entity.force == force or entity.force.name == "neutral" or entity.force.get_friend(force)) then return end
 
     if entity.type == cliff_type then
-        return check_cliff_deconstruction(entity, player)
+        return check_cliff_deconstruction(entity, owner)
     end
 
     local surface = entity.surface
@@ -224,7 +224,7 @@ check_deconstruction = function(entity, player)
         }) do
             local nearby_index = unique_index(nearby)
             local should_check = not data.already_targeted[nearby_index]
-            if should_check and should_process_entity(entity, player, drone_orders.deconstruct) then
+            if should_check and should_process_entity(entity, owner, drone_orders.deconstruct) then
                 data.already_targeted[nearby_index] = true
                 data.sent_deconstruction[nearby_index] = (data.sent_deconstruction[nearby_index] or 0) + 1
                 table.insert(all_targets, nearby)
@@ -252,23 +252,23 @@ check_deconstruction = function(entity, player)
             end
 
             local drone_data = {
-                player = player,
+                owner = owner,
                 order = drone_orders.deconstruct,
                 target = target,
                 extra_targets = batch_extra,
             }
 
-            make_path_request(drone_data, player, target)
+            make_path_request(drone_data, owner, target)
         end
         return
     end
 
-    for _ = 1, math.min(needed, 10, player.get_item_count(shared.units.construction_drone)) do
+    for _ = 1, math.min(needed, 10, owner_item_count(owner, shared.units.construction_drone)) do
         if not (entity and entity.valid) then
             break
         end
-        local drone_data = { player = player, order = drone_orders.deconstruct, target = entity }
-        make_path_request(drone_data, player, entity)
+        local drone_data = { owner = owner, order = drone_orders.deconstruct, target = entity }
+        make_path_request(drone_data, owner, entity)
         sent = sent + 1
     end
 
@@ -279,18 +279,18 @@ check_deconstruction = function(entity, player)
     end
 end
 
-check_repair = function(entity, player)
+check_repair = function(entity, owner)
     if not (entity and entity.valid) then return end
 
     -- Respect player's allow_bot_repair setting
-    if not player.is_shortcut_toggled("drone-repair-toggle") then
+    if not (is_garage(owner) or owner.is_shortcut_toggled("drone-repair-toggle")) then
         return true -- Repairing disabled; skip
     end
 
-    if not should_process_entity(entity, player, drone_orders.repair) then return end
+    if not should_process_entity(entity, owner, drone_orders.repair) then return end
     if entity.has_flag("not-repairable") then return end
     local force = entity.force
-    if not (force == player.force or player.force.get_friend(force)) then
+    if not (force == owner_force(owner) or owner_force(owner).get_friend(force)) then
         return
     end
 
@@ -303,7 +303,7 @@ check_repair = function(entity, player)
     local repair_item
     local source
     for name, _ in pairs(repair_tools) do
-        if player.cheat_mode or player.get_item_count(name) > 0 then
+        if owner_cheat_mode(owner) or owner_item_count(owner, name) > 0 then
             repair_item = { name = name, count = 1 } -- Explicitly set count to 1
             break
         end
@@ -311,7 +311,7 @@ check_repair = function(entity, player)
 
     if not repair_item then
         for name, _ in pairs(repair_tools) do
-            source = find_item_source(player, entity, name, "normal", 1)
+            source = find_item_source(owner, entity, name, "normal", 1)
             if source then
                 repair_item = { name = name, count = 1 }
                 break
@@ -322,44 +322,44 @@ check_repair = function(entity, player)
     if not repair_item then return end -- No repair tool available
 
     local drone_data = {
-        player = player,
+        owner = owner,
         order = drone_orders.repair,
         pickup = { stack = repair_item, source = source }, -- Pickup only one repair item
         target = entity,
     }
 
     data.already_targeted[index] = true
-    make_path_request(drone_data, player, entity)
+    make_path_request(drone_data, owner, entity)
 end
 
-check_job = function(player, job)
+check_job = function(owner, job)
     -- Try to redirect a returning drone before spawning a new one
-    if try_redirect_for_job(player, job) then
+    if try_redirect_for_job(owner, job) then
         return
     end
 
     if job.type == drone_orders.construct then
-        check_ghost(job.entity, player)
+        check_ghost(job.entity, owner)
         return
     end
 
     if job.type == drone_orders.deconstruct then
-        check_deconstruction(job.entity, player)
+        check_deconstruction(job.entity, owner)
         return
     end
 
     if job.type == drone_orders.upgrade then
-        check_upgrade(job.entity, player)
+        check_upgrade(job.entity, owner)
         return
     end
 
     if job.type == drone_orders.request_proxy then
-        check_proxy(job.entity, player)
+        check_proxy(job.entity, owner)
         return
     end
 
     if job.type == drone_orders.repair then
-        check_repair(job.entity, player)
+        check_repair(job.entity, owner)
         return
     end
 end
@@ -367,13 +367,14 @@ end
 process_pickup_command = function(drone_data)
     logs.debug("Processing pickup command")
 
-    local player = drone_data.player
-    if not (player and player.valid) then
+    local owner = drone_data.owner
+    if not (owner and owner.valid) then
         return cancel_drone_order(drone_data)
     end
 
-    -- A chest wired to a garage, or the player, who is right here since the drone spawned on them
+    -- A chest wired to a garage, or whoever sent the drone, who is right here since the drone spawned on them
     local source = drone_data.pickup.source
+    local container = owner_container(owner)
     if source then
         if not source.valid then
             logs.debug("the chest we were sent to is gone")
@@ -381,7 +382,7 @@ process_pickup_command = function(drone_data)
         end
 
         if not move_to_order_target(drone_data, source) then return end
-    elseif not (player.character and player.character.valid) then
+    elseif not (container and container.valid) then
         return cancel_drone_order(drone_data)
     end
 
@@ -390,7 +391,7 @@ process_pickup_command = function(drone_data)
     local drone_inventory = get_drone_inventory(drone_data)
     logs.debug("starting stack transfer to drone")
 
-    transfer_stack(drone_inventory, source or player.character, stack)
+    transfer_stack(drone_inventory, source or container, stack)
 
 
     update_drone_sticker(drone_data)
@@ -403,7 +404,7 @@ end
 process_dropoff_command = function(drone_data)
      --game.print("Procesing dropoff command. "..drone.unit_number)
 
-    if drone_data.player then
+    if drone_data.owner then
         return process_return_to_player_command(drone_data)
     end
 
@@ -514,10 +515,10 @@ end
 -- After deconstructing, check if nearby ghosts need items the drone is carrying.
 -- Returns a ghost entity and its build item if a chain job is found, nil otherwise.
 find_chain_construct_job = function(drone_data)
-    local player = drone_data.player
-    if not (player and player.valid) then return end
+    local owner = drone_data.owner
+    if not (owner and owner.valid) then return end
 
-    local chain_radius = settings.get_player_settings(player)["drone-chain-search-radius"].value
+    local chain_radius = owner_setting(owner, "drone-chain-search-radius")
     if chain_radius <= 0 then return end
 
     local drone = drone_data.entity
@@ -564,15 +565,15 @@ end
 
 -- Find a returning drone belonging to this player that is near the given position.
 -- Returns drone_data of the closest eligible drone, or nil.
-find_returning_drone_near = function(player, position, surface)
-    local redirect_radius = settings.get_player_settings(player)["drone-redirect-radius"].value
+find_returning_drone_near = function(owner, position, surface)
+    local redirect_radius = owner_setting(owner, "drone-redirect-radius")
     if redirect_radius <= 0 then return end
 
     local best_drone_data = nil
     local best_dist_sq = redirect_radius * redirect_radius
 
     for _, drone_data in pairs(data.drone_commands) do
-        if drone_data.returning and drone_data.player == player then
+        if drone_data.returning and drone_data.owner == owner then
             local drone = drone_data.entity
             if drone and drone.valid and drone.surface == surface then
                 local dx = drone.position.x - position.x
@@ -621,11 +622,11 @@ end
 
 -- Try to redirect a returning drone to handle a job instead of spawning a new drone.
 -- Returns true if a drone was successfully redirected.
-try_redirect_for_job = function(player, job)
+try_redirect_for_job = function(owner, job)
     local entity = job.entity
     if not (entity and entity.valid) then return false end
 
-    local drone_data = find_returning_drone_near(player, entity.position, entity.surface)
+    local drone_data = find_returning_drone_near(owner, entity.position, entity.surface)
     if not drone_data then return false end
 
     if job.type == drone_orders.deconstruct then
@@ -665,7 +666,7 @@ redirect_all_returning_drones = function(player)
     if redirect_radius <= 0 then return end
 
     for _, drone_data in pairs(data.drone_commands) do
-        if drone_data.returning and drone_data.player == player then
+        if drone_data.returning and drone_data.owner == player then
             local drone = drone_data.entity
             if drone and drone.valid then
                 -- First try chain construct (drone has items from decon)
@@ -1089,8 +1090,8 @@ process_deconstruct_cliff_command = function(drone_data)
 end
 
 process_return_to_player_command = function(drone_data, force)
-    local player = drone_data.player
-    if not (player and player.valid) then --does the player exist
+    local owner = drone_data.owner
+    if not (owner and owner.valid) then --does whoever sent it out still exist
         return cancel_drone_order(drone_data)
     end
 
@@ -1100,7 +1101,7 @@ process_return_to_player_command = function(drone_data, force)
     -- A garage on the way is a closer place to leave the cargo than the player is
     local drone = drone_data.entity
     local cargo = get_drone_inventory(drone_data)
-    if not (drone_data.garage_is_full or cargo.is_empty()) then
+    if not (is_garage(owner) or drone_data.garage_is_full or cargo.is_empty()) then
         local garage = find_garage_for_dropoff(drone)
         if garage then
             if not move_to_order_target(drone_data, garage) then return end
@@ -1115,25 +1116,31 @@ process_return_to_player_command = function(drone_data, force)
         end
     end
 
-    if not (force or move_to_player(drone_data, player)) then return end -- attempt to move to the player
+    -- A garage stays put, a player walks around, so they are approached differently
+    if is_garage(owner) then
+        if not (force or move_to_order_target(drone_data, owner)) then return end
+    else
+        if not (force or move_to_player(drone_data, owner)) then return end
+    end
 
-    --Now that we're at the player (we think), check they still exist, they might have logged off
-    if not player.valid or not player.character then
+    --Now that we are there, check the owner is still around, the player might have logged off
+    local container = owner_container(owner)
+    if not (owner.valid and container and container.valid) then
         cancel_drone_order(drone_data)
         return
     end
     drone_data.returning = nil
     local inventory = get_drone_inventory(drone_data)
-    transfer_inventory(inventory, player.character)
+    transfer_inventory(inventory, container)
 
     if not inventory.is_empty() then
         drone_wait(drone_data, random(18, 24))
         return
     end
 
-    if player.character.insert({ name = shared.units.construction_drone, count = 1, quality = drone_data.entity.quality }) == 0 then
-        logs.debug("Could not insert drone to player character inventory, waiting")
-        drone_wait(drone_data, random(18, 24)) --If the drone didn't get inserted into the players inventory, wait & follow the player until it does
+    if container.insert({ name = shared.units.construction_drone, count = 1, quality = drone_data.entity.quality }) == 0 then
+        logs.debug("Could not stow the drone, waiting")
+        drone_wait(drone_data, random(18, 24)) --If the drone didn't fit, wait and try again
         return
     end
 

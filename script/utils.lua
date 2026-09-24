@@ -63,11 +63,104 @@ get_beam_orientation = function(source_position, target_position)
     return orientation, { x1, y1 - 0.5 }
 end
 
-should_process_entity = function(entity, player, order_type)
-    if not (entity and entity.valid and player and player.valid) then return false end
-    if player.force.name ~= entity.force.name and entity.force.name ~= "neutral" then return false end
-    local player_surface = player.physical_surface
-    if player_surface ~= entity.surface then return false end -- Ensure entity is on player's physical surface
+-- The drones answer either to a player or to a garage. These few helpers are everything the job pipeline needs
+-- to know about which one it is dealing with.
+is_garage = function(owner)
+    return owner.object_name == "LuaEntity"
+end
+
+
+owner_key = function(owner)
+    if is_garage(owner) then
+        return "g" .. owner.unit_number
+    end
+    return "p" .. owner.index
+end
+
+
+owner_force = function(owner)
+    return owner.force
+end
+
+
+owner_surface = function(owner)
+    if is_garage(owner) then
+        return owner.surface
+    end
+    return owner.physical_surface
+end
+
+
+owner_position = function(owner)
+    if is_garage(owner) then
+        return owner.position
+    end
+    return getPlayerPosition(owner)
+end
+
+
+-- Where a drone leaves from. A garage is a building, so its own tile is solid: paths that start inside it fail,
+-- and so does spawning there.
+owner_spawn_position = function(owner)
+    if not is_garage(owner) then
+        return owner_position(owner)
+    end
+
+    local free = owner.surface.find_non_colliding_position(
+        "normal-" .. shared.units.construction_drone,
+        owner.position,
+        8,
+        0.5,
+        false
+    )
+    return free or owner.position
+end
+
+
+-- The entity the drones take items from and bring them back to
+owner_container = function(owner)
+    if is_garage(owner) then
+        return owner
+    end
+    return owner.character
+end
+
+
+owner_cheat_mode = function(owner)
+    if is_garage(owner) then
+        return false
+    end
+    return owner.cheat_mode
+end
+
+
+-- Per user settings have no meaning for a garage, it falls back to what the setting ships with
+owner_setting = function(owner, name)
+    if is_garage(owner) then
+        return prototypes.mod_setting[name].default_value
+    end
+    return settings.get_player_settings(owner)[name].value
+end
+
+
+owner_item_count = function(owner, item)
+    local container = owner_container(owner)
+    if not (container and container.valid) then
+        return 0
+    end
+    return container.get_item_count(item)
+end
+
+
+should_process_entity = function(entity, owner, order_type)
+    if not (entity and entity.valid and owner and owner.valid) then return false end
+    if owner_force(owner).name ~= entity.force.name and entity.force.name ~= "neutral" then return false end
+    if owner_surface(owner) ~= entity.surface then return false end
+
+    -- A garage answers to nobody, it works on anything of its own force in its area
+    if is_garage(owner) then return true end
+
+    local player = owner
 
     -- Map drone order type to the corresponding setting
     local setting_name
@@ -291,17 +384,54 @@ count_active_drones = function()
     local counts = {}
 
     for _, drone_data in pairs(data.drone_commands) do
-        local player = drone_data.player
-        if player and player.valid then
-            counts[player.index] = (counts[player.index] or 0) + 1
+        local owner = drone_data.owner
+        if owner and owner.valid then
+            local key = owner_key(owner)
+            counts[key] = (counts[key] or 0) + 1
         end
     end
 
-    for player_index, requested in pairs(data.request_count) do
-        counts[player_index] = (counts[player_index] or 0) + requested
+    for key, requested in pairs(data.request_count) do
+        counts[key] = (counts[key] or 0) + requested
     end
 
     return counts
+end
+
+
+-- Every garage on every surface, cached and refreshed on a slow beat, plus whenever one is built or mined
+local all_garages_cache
+local all_garages_tick = -1000
+local all_garages_interval = 300
+
+invalidate_garage_cache = function()
+    all_garages_tick = -1000
+end
+
+
+get_all_garages = function()
+    if all_garages_cache and all_garages_tick + all_garages_interval > game.tick then
+        -- One of them may have been mined since the list was built
+        local still_there = {}
+        for _, garage in pairs(all_garages_cache) do
+            if garage.valid then
+                still_there[#still_there + 1] = garage
+            end
+        end
+        all_garages_cache = still_there
+        return all_garages_cache
+    end
+
+    local garages = {}
+    for _, surface in pairs(game.surfaces) do
+        for _, garage in pairs(surface.find_entities_filtered { name = shared.entities.drone_garage }) do
+            garages[#garages + 1] = garage
+        end
+    end
+
+    all_garages_cache = garages
+    all_garages_tick = game.tick
+    return garages
 end
 
 
@@ -339,15 +469,19 @@ get_garage_bonus = function(player)
 end
 
 
--- How many more drones this player may command right now
-get_drone_budget = function(player)
-    -- Without a controller nobody takes orders, garages or not
-    local capacity = get_controller_capacity(player)
+-- How many more drones this owner may command right now
+get_drone_budget = function(owner)
+    if is_garage(owner) then
+        return shared.garage.drone_bonus - (active_drone_counts[owner_key(owner)] or 0)
+    end
+
+    -- Without a controller nobody takes orders
+    local capacity = get_controller_capacity(owner)
     if capacity <= 0 then
         return 0
     end
 
-    return capacity + get_garage_bonus(player) - (active_drone_counts[player.index] or 0)
+    return capacity + get_garage_bonus(owner) - (active_drone_counts[owner_key(owner)] or 0)
 end
 
 
@@ -439,14 +573,14 @@ end
 
 
 -- Where the drone should pick the item up: nil means the player carries it, an entity means go there
-find_item_source = function(player, entity, item_name, quality, count)
-    if player.cheat_mode then
+find_item_source = function(owner, entity, item_name, quality, count)
+    if owner_cheat_mode(owner) then
         return
     end
 
-    if player.get_item_count({ name = item_name, quality = quality }) >= count then
+    if owner_item_count(owner, { name = item_name, quality = quality }) >= count then
         return
     end
 
-    return find_wired_chest(player.force, entity.surface, entity.position, item_name, quality, count)
+    return find_wired_chest(owner_force(owner), entity.surface, entity.position, item_name, quality, count)
 end

@@ -1,15 +1,15 @@
 local random = math.random
 local insert = table.insert
 
-make_path_request = function(drone_data, player, target)
-    local collision_mask_to_use = get_collision_mask(player)
+make_path_request = function(drone_data, owner, target)
+    local collision_mask_to_use = get_collision_mask(owner)
 
-    local path_id = player.physical_surface.request_path {
+    local path_id = owner_surface(owner).request_path {
         bounding_box = shared.bounding_box,
         collision_mask = collision_mask_to_use,  -- Use the determined mask
-        start = getPlayerPosition(player),
+        start = owner_spawn_position(owner),
         goal = target.position,
-        force = player.force,
+        force = owner_force(owner),
         radius = target.get_radius() + 4,
         pathfind_flags = drone_pathfind_flags,
         can_open_gates = true,
@@ -18,23 +18,29 @@ make_path_request = function(drone_data, player, target)
 
     data.path_requests[path_id] = drone_data
 
-    local index = player.index
-    data.request_count[index] = (data.request_count[index] or 0) + 1
+    local key = owner_key(owner)
+    data.request_count[key] = (data.request_count[key] or 0) + 1
 end
 
-make_player_drone = function(player)
-    local player_position
-    if not settings.global["remote-view-spawn"].value and (player.controller_type == defines.controllers.remote) then
+make_player_drone = function(owner)
+    local spawn_position
+    if is_garage(owner) then
+        spawn_position = owner_spawn_position(owner)
+    elseif not settings.global["remote-view-spawn"].value and (owner.controller_type == defines.controllers.remote) then
         -- Fallback to physical_position in remote view if remote-view-spawn is disabled
         logs.debug("returning physical location due to remote view")
-        player_position = player.physical_position
+        spawn_position = owner.physical_position
     else
         -- Default to player.position (could be remote view)
-        player_position = player.position
+        spawn_position = owner.position
     end
-    local player_surface = player.physical_surface
+    local player_surface = owner_surface(owner)
+    local container = owner_container(owner)
+    if not (container and container.valid) then
+        return
+    end
 
-    local available_drones = get_quality_drones(player.character)
+    local available_drones = get_quality_drones(container)
     if #available_drones == 0 then
         logs.debug("No available drones of any quality")
         return
@@ -44,10 +50,10 @@ make_player_drone = function(player)
     local drone_to_use = available_drones[math.random(#available_drones)]
     local prototype_name = drone_to_use.quality .. "-" .. drone_to_use.name
 
-    -- Find a spawn position close to the player
+    -- Find a spawn position close to whoever sends it out
     local position = player_surface.find_non_colliding_position(
             prototype_name,
-            player_position,
+            spawn_position,
             5,
             0.5,
             false
@@ -58,16 +64,16 @@ make_player_drone = function(player)
         return
     end
 
-    -- Remove a drone from the player's inventory
+    -- Take the drone out of wherever it was stored
     local to_remove = { name = shared.units.construction_drone, count = 1, quality = drone_to_use.quality }
-    logs.debug("drone to remove from character: " .. serpent.block(to_remove))
-    local removed = player.character.remove_item(to_remove)
+    logs.debug("drone to remove from container: " .. serpent.block(to_remove))
+    local removed = container.remove_item(to_remove)
     if removed == 0 then
-        logs.debug("could not remove drone from player inventory")
+        logs.debug("could not remove drone from the owner inventory")
         return
     end
 
-    if use_spectral_drones(player) then
+    if use_spectral_drones(owner) then
         prototype_name = prototype_name.."_spectral"
     end
 
@@ -75,14 +81,14 @@ make_player_drone = function(player)
     local drone = player_surface.create_entity {
         name = prototype_name,
         position = position,
-        force = player.force,
+        force = owner_force(owner),
         quality = drone_to_use.quality
     }
 
-    -- Attach the player to the drone data entry
+    -- Attach the owner to the drone data entry
     local drone_data = {
         entity = drone,
-        player = player,
+        owner = owner,
     }
 
     -- Register the drone for tracking
@@ -119,9 +125,15 @@ find_a_player = function(drone_data)
     local drone = drone_data.entity
     if not (drone and drone.valid) then return end
 
-    -- Ensure the drone always targets the player who spawned it.
-    local original_player = drone_data.player
-    if original_player and original_player.valid and original_player.character and original_player.physical_surface == drone.surface then
+    -- Ensure the drone always reports back to whoever sent it out.
+    local owner = drone_data.owner
+    if not (owner and owner.valid) then return false end
+
+    if is_garage(owner) then
+        return owner.surface == drone.surface
+    end
+
+    if owner.character and owner.physical_surface == drone.surface then
         return true
     end
 
@@ -147,7 +159,7 @@ park_drone = function(drone_data)
     if not (drone and drone.valid) then return end
     if not data.parked_drones then data.parked_drones = {} end
     local unit_number = drone.unit_number
-    local player = drone_data.player
+    local player = drone_data.owner
     data.parked_drones[unit_number] = player and player.index or true
     -- Issue a very long stop command so the drone doesn't trigger on_ai_command_completed frequently
     drone.commandable.set_command {
@@ -415,12 +427,13 @@ end
 cancel_player_drone_orders = function(player)
     -- Iterate through all drones commanded by this player and park them (for disconnect)
     for unit_number, drone_data in pairs(data.drone_commands) do
-        if drone_data.player == player and drone_data.entity and drone_data.entity.valid then
+        if drone_data.owner == player and drone_data.entity and drone_data.entity.valid then
             clear_extra_targets(drone_data)
             clear_target(drone_data)
 
-            if data.job_queue[player.index] then
-                data.job_queue[player.index][unit_number] = nil
+            local queue = data.job_queue[owner_key(player)]
+            if queue then
+                queue[unit_number] = nil
             end
 
             drone_data.order = nil
@@ -436,12 +449,13 @@ end
 -- Unlike parking, these drones actively travel home and can be redirected if toggle is re-enabled.
 return_player_drones = function(player)
     for unit_number, drone_data in pairs(data.drone_commands) do
-        if drone_data.player == player and drone_data.entity and drone_data.entity.valid then
+        if drone_data.owner == player and drone_data.entity and drone_data.entity.valid then
             clear_extra_targets(drone_data)
             clear_target(drone_data)
 
-            if data.job_queue[player.index] then
-                data.job_queue[player.index][unit_number] = nil
+            local queue = data.job_queue[owner_key(player)]
+            if queue then
+                queue[unit_number] = nil
             end
 
             drone_data.order = nil
