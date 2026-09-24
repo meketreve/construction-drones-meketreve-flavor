@@ -74,6 +74,8 @@ ignored_types = {
     "sticker",
     "speech-bubble",
 }
+-- Recomputed every tick from data.drone_commands, see count_active_drones
+active_drone_counts = {}
 search_offsets = {}
 search_refresh = nil
 offsets = { { 0, 0 }, { 0.25, 0 }, { 0, 0.25 }, { 0.25, 0.25 } }

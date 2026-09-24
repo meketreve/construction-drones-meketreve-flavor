@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.2.0
+Date: 2026-09-24
+  Info:
+    - Forked from daz96050's Construction Drones as a separate mod, "Construction Drones - Meketreve flavor".
+  Features:
+    - Added the drone controller. It is a gun, so it goes in a weapon slot, which the character has from the
+      start. Without one, the drones take no orders, and each controller you carry commands a few drones at the
+      same time, more if it is of a higher quality.
+  Bugfixes:
+    - Upgrading an entity with a full drone no longer deletes the old entity, it is dropped on the ground.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.12
 Date: 26 June 2026
   Bugfix:

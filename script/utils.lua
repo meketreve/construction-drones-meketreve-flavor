@@ -258,3 +258,59 @@ console = function(string)
     game.print(string)
     log(string)
 end
+
+-- The controller is a gun, and the character has weapon slots from the start, unlike the armor grid. Every
+-- controller in a weapon slot adds its own capacity, so you can trade weapon slots for drones.
+get_controller_capacity = function(player)
+    local character = player.character
+    if not (character and character.valid) then
+        return 0
+    end
+
+    local guns = character.get_inventory(defines.inventory.character_guns)
+    if not guns then
+        return 0
+    end
+
+    local controller_name = shared.items.drone_controller
+    local capacity = 0
+    for index = 1, #guns do
+        local stack = guns[index]
+        if stack and stack.valid_for_read and stack.name == controller_name then
+            local quality = stack.quality and stack.quality.name or "normal"
+            capacity = capacity + (shared.controller_capacity[quality] or shared.controller_capacity.normal)
+        end
+    end
+
+    return capacity
+end
+
+
+-- Drones already out, plus the ones whose path is still being calculated, per player index
+count_active_drones = function()
+    local counts = {}
+
+    for _, drone_data in pairs(data.drone_commands) do
+        local player = drone_data.player
+        if player and player.valid then
+            counts[player.index] = (counts[player.index] or 0) + 1
+        end
+    end
+
+    for player_index, requested in pairs(data.request_count) do
+        counts[player_index] = (counts[player_index] or 0) + requested
+    end
+
+    return counts
+end
+
+
+-- How many more drones this player may command right now
+get_drone_budget = function(player)
+    local capacity = get_controller_capacity(player)
+    if capacity <= 0 then
+        return 0
+    end
+
+    return capacity - (active_drone_counts[player.index] or 0)
+end

@@ -108,6 +108,12 @@ can_player_spawn_drones = function(player)
     if not player.is_shortcut_toggled("construction-drone-toggle") then
         return
     end
+
+    -- No controller in a weapon slot, no one to give the orders
+    if get_drone_budget(player) <= 0 then
+        return
+    end
+
     local current_item_count = get_available_drones(player)
 
     local count = current_item_count - (data.request_count[player.index] or 0)
@@ -120,7 +126,8 @@ check_player_jobs = function(player)
     if not queue then return end
     local count = math.min(
             5,
-            get_available_drones(player) - (data.request_count[player.index] or 0)
+            get_available_drones(player) - (data.request_count[player.index] or 0),
+            get_drone_budget(player)
     )
 
     for _ = 1, count do
@@ -184,6 +191,8 @@ end
 
 on_tick = function(event)
     check_search_queue()
+
+    active_drone_counts = count_active_drones()
 
     for _, player in pairs(game.connected_players) do
         check_player_jobs(player)
@@ -333,6 +342,10 @@ on_construction_drone_toggle = function(event)
     else
         -- Toggle ON: redirect any returning drones to nearby work
         redirect_all_returning_drones(player)
+
+        if get_controller_capacity(player) <= 0 then
+            player.print { "message.no-drone-controller" }
+        end
     end
 end
 

@@ -43,6 +43,19 @@ data.entities = {
     construction_drone_proxy_chest = "Construction_Drone_Proxy_Chest",
 }
 
+data.items = { drone_controller = "drone-controller" }
+
+data.ammo_categories = { drone_control = "drone-control" }
+
+-- How many drones one controller commands at the same time, per quality of the controller
+data.controller_capacity = {
+    ["normal"] = 5,
+    ["uncommon"] = 7,
+    ["rare"] = 9,
+    ["epic"] = 12,
+    ["legendary"] = 16,
+}
+
 data.beams = {
     build = "Build_beam",
     deconstruction = "Deconstruct_Beam",
