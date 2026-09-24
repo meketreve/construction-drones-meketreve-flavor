@@ -2,17 +2,54 @@ local path = util.path("data/units/construction_drone/")
 local name = shared.entities.drone_garage
 local technology_name = shared.technologies.drone_garage
 
--- The steel chest already carries a circuit connector and the wire reach, which is the whole point of the garage:
--- the chests you wire to it are what the drones may take from.
+local graphics = util.path("data/entities/graphics/")
+
+-- The sprite is drawn at 64 pixels per tile, so it is placed at half scale. Its footprint centre sits 28 pixels
+-- below the middle of the canvas, hence the shift.
+local antenna_shift = { 0, -1.65625 }
+
+-- A steel chest to start from, because it already carries a circuit connector and the wire reach, which is the
+-- whole point of the garage: the chests you wire to it are what the drones may take from.
 local garage = util.copy(data.raw.container["steel-chest"])
 garage.name = name
-garage.icon = path .. "logistic_beacon_icon.png"
-garage.icon_size = 150
+garage.icon = graphics .. "drone_garage_icon.png"
+garage.icon_size = 64
 garage.inventory_size = 20
 garage.minable = { mining_time = 0.5, result = name }
 garage.next_upgrade = nil
 garage.fast_replaceable_group = nil
-util.recursive_hack_tint(garage, { r = 0.45, g = 0.8, b = 1 })
+garage.max_health = 350
+garage.corpse = "big-remnants"
+garage.dying_explosion = "medium-explosion"
+garage.collision_box = { { -1.35, -1.35 }, { 1.35, 1.35 } }
+garage.selection_box = { { -1.5, -1.5 }, { 1.5, 1.5 } }
+-- The wires keep the chest connector, which lands them near the middle of the platform
+garage.circuit_wire_max_distance = 12
+garage.picture = {
+    layers = {
+        {
+            filename = graphics .. "drone_garage_base.png",
+            width = 256,
+            height = 256,
+            scale = 0.5,
+            shift = { 0, -0.4375 },
+        },
+    },
+}
+
+-- The antenna spins on its own, drawn over the garage by the control stage
+local antenna = {
+    type = "animation",
+    name = name .. "-antenna",
+    filename = graphics .. "drone_garage_antenna.png",
+    width = 160,
+    height = 160,
+    frame_count = 24,
+    line_length = 6,
+    scale = 0.5,
+    animation_speed = 0.4,
+    shift = antenna_shift,
+}
 
 local item = util.copy(data.raw.item["steel-chest"])
 item.name = name
@@ -38,8 +75,8 @@ local recipe = {
 local technology = {
     type = "technology",
     name = technology_name,
-    icon = path .. "construction_drone_technology.png",
-    icon_size = 150,
+    icon = graphics .. "drone_garage_icon.png",
+    icon_size = 64,
     effects = { { type = "unlock-recipe", recipe = name } },
     prerequisites = { "radar" },
     unit = {
@@ -50,4 +87,4 @@ local technology = {
     order = "c-k-a",
 }
 
-data:extend { garage, item, recipe, technology }
+data:extend { garage, antenna, item, recipe, technology }

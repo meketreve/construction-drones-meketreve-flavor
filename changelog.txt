@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.7.0
+Date: 2026-09-24
+  Changes:
+    - The garage is now a 3 by 3 building with its own artwork and an antenna that turns, instead of a tinted
+      steel chest.
+  Features:
+    - Added Brazilian Portuguese.
+---------------------------------------------------------------------------------------------------
 Version: 1.6.0
 Date: 2026-09-24
   Changes:

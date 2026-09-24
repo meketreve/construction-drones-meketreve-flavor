@@ -54,6 +54,7 @@ data = {
     already_targeted = {},
     search_queue = {},
     parked_drones = {},
+    garage_antennas = {},
 }
 
 prototype_cache = {}

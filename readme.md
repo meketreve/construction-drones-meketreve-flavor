@@ -32,7 +32,8 @@ The drones take their orders from a **drone controller**. It is a gun, so it goe
 character has from the start, and each controller you carry commands a few drones at the same time, more if it is
 of a higher quality. Without one in a weapon slot, the drones sit still.
 
-The **drone garage** is unlocked by a technology behind radar, and does three things:
+The **drone garage** is a 3 by 3 building with a turning antenna, unlocked by a technology behind radar. It does
+three things:
 
 * it commands five more drones while its area covers you, so building several is how you get a bigger swarm
 * drones on their way back unload their cargo into a garage in range instead of into your pockets

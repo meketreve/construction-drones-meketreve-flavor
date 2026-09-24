@@ -282,6 +282,12 @@ on_ai_command_completed = function(event)
 end
 
 on_entity_removed = function(event)
+    local removed = event.entity
+    if removed and removed.valid and removed.name == shared.entities.drone_garage then
+        remove_garage_antenna(removed.unit_number)
+        invalidate_garage_cache()
+    end
+
     local unit_number
     local entity = event.entity
     if entity and entity.valid then
@@ -324,6 +330,15 @@ on_player_created = function(event)
     local player = game.get_player(event.player_index)
     player.set_shortcut_toggled("construction-drone-toggle", true)
 end
+
+on_entity_built = function(event)
+    local entity = event.entity or event.destination
+    if entity and entity.valid and entity.name == shared.entities.drone_garage then
+        invalidate_garage_cache()
+        add_garage_antenna(entity)
+    end
+end
+
 
 on_entity_cloned = function(event)
     local destination = event.destination
@@ -487,6 +502,12 @@ lib.events = {
     [defines.events.on_ai_command_completed] = on_ai_command_completed,
     [defines.events.on_entity_cloned] = on_entity_cloned,
 
+    [defines.events.on_built_entity] = on_entity_built,
+    [defines.events.on_robot_built_entity] = on_entity_built,
+    [defines.events.on_space_platform_built_entity] = on_entity_built,
+    [defines.events.script_raised_built] = on_entity_built,
+    [defines.events.script_raised_revive] = on_entity_built,
+
     [defines.events.on_script_path_request_finished] = on_script_path_request_finished,
     [defines.events.on_lua_shortcut] = on_lua_shortcut,
     ["construction-drone-toggle"] = on_construction_drone_toggle,
@@ -527,6 +548,7 @@ end
 
 lib.on_configuration_changed = function()
     game.map_settings.path_finder.use_path_cache = false
+    refresh_garage_antennas()
     data.path_requests = data.path_requests or {}
     data.request_count = data.request_count or {}
     data.parked_drones = data.parked_drones or {}

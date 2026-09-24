@@ -584,3 +584,56 @@ find_item_source = function(owner, entity, item_name, quality, count)
 
     return find_wired_chest(owner_force(owner), entity.surface, entity.position, item_name, quality, count)
 end
+
+
+-- The antenna on top of a garage is a rendered animation, since a container prototype can only hold a still
+-- picture. One per garage, kept in storage so it survives a save.
+local antenna_name = shared.entities.drone_garage .. "-antenna"
+
+add_garage_antenna = function(garage)
+    if not (garage and garage.valid and garage.name == shared.entities.drone_garage) then
+        return
+    end
+
+    data.garage_antennas = data.garage_antennas or {}
+    local existing = data.garage_antennas[garage.unit_number]
+    if existing and existing.valid then
+        return
+    end
+
+    data.garage_antennas[garage.unit_number] = rendering.draw_animation {
+        animation = antenna_name,
+        target = garage,
+        surface = garage.surface,
+        render_layer = "higher-object-above",
+    }
+end
+
+
+remove_garage_antenna = function(unit_number)
+    if not (unit_number and data.garage_antennas) then
+        return
+    end
+
+    local antenna = data.garage_antennas[unit_number]
+    if antenna and antenna.valid then
+        antenna.destroy()
+    end
+    data.garage_antennas[unit_number] = nil
+end
+
+
+refresh_garage_antennas = function()
+    data.garage_antennas = data.garage_antennas or {}
+
+    for unit_number, antenna in pairs(data.garage_antennas) do
+        if not (antenna and antenna.valid) then
+            data.garage_antennas[unit_number] = nil
+        end
+    end
+
+    invalidate_garage_cache()
+    for _, garage in pairs(get_all_garages()) do
+        add_garage_antenna(garage)
+    end
+end
