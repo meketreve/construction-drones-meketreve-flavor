@@ -1,4 +1,4 @@
-util = require "__Construction_Drones_Forked__/data/tf_util/tf_util"
+util = require "__Construction_Drones_Meketreve__/data/tf_util/tf_util"
 shared = require("shared")
 require "data/units/units"
 require "data/hotkeys"
@@ -17,7 +17,7 @@ data:extend({
     {
         type = "technology",
         name = "spectral-drones",
-        icon = "__Construction_Drones_Forked__/graphics/technology/spectral-drones-128.png",
+        icon = "__Construction_Drones_Meketreve__/graphics/technology/spectral-drones-128.png",
         icon_size = 128,
         effects = {},
         prerequisites = prereq,  -- Adjust prerequisites as needed (e.g., based on your mod's tech tree)

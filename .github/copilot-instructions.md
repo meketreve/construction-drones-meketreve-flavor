@@ -1,4 +1,4 @@
-Project: Construction_Drones_Forked — Copilot instructions
+Project: Construction_Drones_Meketreve — Copilot instructions
 
 Purpose
 - Help AI coding agents become productive quickly in this Factorio mod codebase.
@@ -55,7 +55,7 @@ Settings reference
 - `drone_process_other_player_construction/deconstruction/upgrade/proxies` (per-user bool): Cross-player job processing.
 
 Project-specific conventions
-- Module requires: control-stage code uses relative require paths like `require("script/utils")` — maintain this layout (control stage is per-mod isolated, so no cross-mod collision). Data-stage requires of shared-named lib files MUST be mod-qualified, e.g. `require("__Construction_Drones_Forked__/data/tf_util/tf_util")`, NOT the bare `require("data/tf_util/tf_util")`. The data stage shares one Lua state and caches modules by the bare path string; a bare relative require to a file whose name also exists in another mod (e.g. Teleporters also ships `data/tf_util/tf_util`) collides in the shared cache, and the alphabetically-first mod's copy wins for both — baking the wrong mod's `util.path` into sprite filenames. Do not "simplify" these back to relative paths.
+- Module requires: control-stage code uses relative require paths like `require("script/utils")` — maintain this layout (control stage is per-mod isolated, so no cross-mod collision). Data-stage requires of shared-named lib files MUST be mod-qualified, e.g. `require("__Construction_Drones_Meketreve__/data/tf_util/tf_util")`, NOT the bare `require("data/tf_util/tf_util")`. The data stage shares one Lua state and caches modules by the bare path string; a bare relative require to a file whose name also exists in another mod (e.g. Teleporters also ships `data/tf_util/tf_util`) collides in the shared cache, and the alphabetically-first mod's copy wins for both — baking the wrong mod's `util.path` into sprite filenames. Do not "simplify" these back to relative paths.
 - Event modules export a `lib` table and list events in `lib.events` keyed by `defines.events` or custom shortcut names. Do not mutate the event handler registration pattern.
 - Use `data:extend` only in data-stage files and avoid runtime require of data-only code.
 

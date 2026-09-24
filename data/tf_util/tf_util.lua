@@ -19,7 +19,7 @@ util.recursive_hack_tint = function(array, tint)
 end
 
 util.path = function(str)
-    return "__Construction_Drones_Forked__/" .. str
+    return "__Construction_Drones_Meketreve__/" .. str
 end
 
 util.damage_type = function(name)
