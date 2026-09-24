@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.7.1
+Date: 2026-09-24
+  Features:
+    - The garage now shows the area it works in while you hold one on the cursor, or select one that is already
+      built, the same way a roboport shows its construction area.
+---------------------------------------------------------------------------------------------------
 Version: 1.7.0
 Date: 2026-09-24
   Changes:

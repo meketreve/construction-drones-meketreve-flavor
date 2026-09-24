@@ -38,6 +38,7 @@ three things:
 * it commands five more drones while its area covers you, so building several is how you get a bigger swarm
 * drones on their way back unload their cargo into a garage in range instead of into your pockets
 * chests **wired to it** with red or green wire become places the drones may take items from
+* it shows that area on the ground while you hold a garage on the cursor, or select one already built
 * it looks for work in its own area and sends its own drones, so put drones inside it and the base keeps being
   built while you are somewhere else. Those drones come back to the garage, unload there and stow themselves
 

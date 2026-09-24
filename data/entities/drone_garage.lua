@@ -25,6 +25,19 @@ garage.collision_box = { { -1.35, -1.35 }, { 1.35, 1.35 } }
 garage.selection_box = { { -1.5, -1.5 }, { 1.5, 1.5 } }
 -- The wires keep the chest connector, which lands them near the middle of the platform
 garage.circuit_wire_max_distance = 12
+-- Shows the area the garage works in, while its item is on the cursor or the garage itself is selected, the same
+-- way a roboport shows its construction area.
+garage.radius_visualisation_specification = {
+    sprite = {
+        filename = "__core__/graphics/visualization-construction-radius.png",
+        priority = "extra-high-no-scale",
+        width = 12,
+        height = 12,
+    },
+    distance = shared.garage.radius,
+    draw_in_cursor = true,
+    draw_on_selection = true,
+}
 garage.picture = {
     layers = {
         {
