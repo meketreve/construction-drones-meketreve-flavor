@@ -55,6 +55,7 @@ data = {
     search_queue = {},
     parked_drones = {},
     garage_antennas = {},
+    garage_previews = {},
 }
 
 prototype_cache = {}

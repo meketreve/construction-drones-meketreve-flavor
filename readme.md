@@ -37,8 +37,11 @@ three things:
 
 * it commands five more drones while its area covers you, so building several is how you get a bigger swarm
 * drones on their way back unload their cargo into a garage in range instead of into your pockets
-* chests **wired to it** with red or green wire become places the drones may take items from
-* it shows that area on the ground while you hold a garage on the cursor, or select one already built
+* chests **wired to it** with red or green wire become places the drones may take items from, and garages within
+  radio range of each other share what they hear, so a chest wired to one of them supplies the work around all
+  of them
+* it shows that area on the ground while you hold a garage on the cursor, or select one already built, and the
+  garages already standing show theirs at the same time
 * it shares drones with the other garages: one with work but no drones borrows from the closest garage that has
   any, and every drone stows itself in whichever garage is closest to where it finished, so the crews drift
   towards the work on their own

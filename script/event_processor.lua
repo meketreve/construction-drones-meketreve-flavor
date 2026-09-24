@@ -331,11 +331,25 @@ on_player_created = function(event)
     player.set_shortcut_toggled("construction-drone-toggle", true)
 end
 
+on_player_cursor_stack_changed = function(event)
+    update_garage_previews(game.get_player(event.player_index))
+end
+
+
+on_player_changed_surface = function(event)
+    update_garage_previews(game.get_player(event.player_index))
+end
+
+
 on_entity_built = function(event)
     local entity = event.entity or event.destination
     if entity and entity.valid and entity.name == shared.entities.drone_garage then
         invalidate_garage_cache()
         add_garage_antenna(entity)
+
+        for _, player in pairs(game.connected_players) do
+            update_garage_previews(player)
+        end
     end
 end
 
@@ -454,6 +468,7 @@ end
 on_player_left_game = function(event)
     local player = game.get_player(event.player_index)
     cancel_player_drone_orders(player)
+    clear_garage_previews(event.player_index)
     data.job_queue[owner_key(player)] = nil
 end
 
@@ -501,6 +516,9 @@ lib.events = {
 
     [defines.events.on_ai_command_completed] = on_ai_command_completed,
     [defines.events.on_entity_cloned] = on_entity_cloned,
+
+    [defines.events.on_player_cursor_stack_changed] = on_player_cursor_stack_changed,
+    [defines.events.on_player_changed_surface] = on_player_changed_surface,
 
     [defines.events.on_built_entity] = on_entity_built,
     [defines.events.on_robot_built_entity] = on_entity_built,

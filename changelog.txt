@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.9.0
+Date: 2026-09-24
+  Features:
+    - Garages close enough to hear each other share what their chests hold, so a chest wired to one garage also
+      supplies work around another. The drone still walks, so a chest further from the job than a garage can
+      hear is left alone.
+    - Holding a garage on the cursor now shows the area of the garages already built, to place the new one by.
+---------------------------------------------------------------------------------------------------
 Version: 1.8.0
 Date: 2026-09-24
   Features:
