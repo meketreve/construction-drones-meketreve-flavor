@@ -435,12 +435,32 @@ get_all_garages = function()
 end
 
 
--- Garages whose area covers this position. Looked up rarely, the answer only changes when one is built or mined.
+-- The area a garage works in: a square of tiles around it, the way a roboport covers a square, not a circle.
+garage_area = function(position)
+    local reach = shared.garage.radius
+    local x = position.x or position[1]
+    local y = position.y or position[2]
+    return {
+        { x - reach, y - reach },
+        { x + reach, y + reach },
+    }
+end
+
+
+-- Two garages are on the same network when the areas they cover touch, which is how roboports join up
+garages_touch = function(one, other)
+    local reach = shared.garage.radius * 2
+    return math.abs(one.position.x - other.position.x) <= reach
+        and math.abs(one.position.y - other.position.y) <= reach
+end
+
+
+-- Garages whose area covers this position. The square is symmetric, so asking which garages sit inside the square
+-- around the position gives the same answer.
 get_garages_in_range = function(surface, position, force)
     return surface.find_entities_filtered {
         name = shared.entities.drone_garage,
-        position = position,
-        radius = shared.garage.radius,
+        area = garage_area(position),
         force = force,
     }
 end
@@ -530,8 +550,7 @@ local get_wired_chests = function(garage, force)
     if next(networks) then
         for _, chest in pairs(garage.surface.find_entities_filtered {
             type = chest_types,
-            position = garage.position,
-            radius = shared.garage.radius,
+            area = garage_area(garage.position),
             force = force,
         }) do
             for connector_id, network_id in pairs(networks) do
@@ -549,10 +568,9 @@ local get_wired_chests = function(garage, force)
 end
 
 
--- Garages talk to each other, each of them carries a radar after all, so garages close enough to hear one
--- another form a network. What one of them knows, all of them know.
+-- Garages whose areas touch join into one network, and a garage in the middle chains two that do not touch each
+-- other, exactly like roboports. What one of them knows, all of them know.
 get_garage_network = function(garage)
-    local reach = shared.garage.network_distance
     local network = { garage }
     local seen = { [garage.unit_number] = true }
     local index = 1
@@ -563,8 +581,7 @@ get_garage_network = function(garage)
 
         for _, other in pairs(get_all_garages()) do
             if other.valid and not seen[other.unit_number] and other.surface == garage.surface
-                and other.force == garage.force
-                and distance(other.position, current.position) <= reach then
+                and other.force == garage.force and garages_touch(current, other) then
                 seen[other.unit_number] = true
                 network[#network + 1] = other
             end
@@ -575,14 +592,12 @@ get_garage_network = function(garage)
 end
 
 
--- A chest holds what it holds, but a drone only knows about the ones wired to a garage. Any garage in the network
--- of the ones covering the job will do, since they share what they hear, but the drone still has to walk there,
--- so a chest further from the job than one garage can hear is left alone.
+-- A chest holds what it holds, but a drone only knows about the ones wired to a garage. Any garage on the same
+-- network will do, the way any chest on a logistic network serves the whole network.
 -- Returns the closest usable chest, or nil, which means the player carries it or nobody does.
 find_wired_chest = function(force, surface, position, item_name, quality, count)
     local quality_name = quality and (type(quality) == "string" and quality or quality.name) or "normal"
     local wanted = { name = item_name, quality = quality_name }
-    local walking_limit = shared.garage.network_distance
 
     local candidates = {}
     local asked = {}
@@ -592,8 +607,7 @@ find_wired_chest = function(force, surface, position, item_name, quality, count)
                 asked[networked.unit_number] = true
 
                 for _, chest in pairs(get_wired_chests(networked, force)) do
-                    if chest.valid and distance(chest.position, position) <= walking_limit
-                        and chest.get_item_count(wanted) >= count then
+                    if chest.valid and chest.get_item_count(wanted) >= count then
                         candidates[chest.unit_number] = chest
                     end
                 end
@@ -718,13 +732,14 @@ find_drone_source_garage = function(garage)
         return garage
     end
 
-    local lender, how_far = find_nearest_garage(garage.surface, garage.position, garage.force, function(other)
-        return other ~= garage and get_available_drones(other) > 0
-    end)
-
-    if lender and how_far <= shared.garage.network_distance then
-        return lender
+    local on_the_network = {}
+    for _, other in pairs(get_garage_network(garage)) do
+        on_the_network[other.unit_number] = true
     end
+
+    return (find_nearest_garage(garage.surface, garage.position, garage.force, function(other)
+        return on_the_network[other.unit_number] and other ~= garage and get_available_drones(other) > 0
+    end))
 end
 
 
@@ -741,8 +756,9 @@ end
 
 -- While a garage is on the cursor, the ones already built show their area too, so there is something to line the
 -- new one up against. The game only draws the radius of the thing being held.
-local preview_colour = { r = 0.25, g = 0.65, b = 0.35, a = 0.10 }
-local preview_border = { r = 0.35, g = 0.85, b = 0.45, a = 0.55 }
+-- the green the game paints a construction area with, __core__/graphics/visualization-construction-radius.png
+local preview_colour = { r = 0.51, g = 0.85, b = 0.22, a = 0.08 }
+local preview_border = { r = 0.51, g = 0.85, b = 0.22, a = 0.45 }
 
 clear_garage_previews = function(player_index)
     data.garage_previews = data.garage_previews or {}
@@ -785,19 +801,22 @@ update_garage_previews = function(player)
 
     for _, garage in pairs(get_all_garages()) do
         if garage.valid and garage.surface == surface and garage.force == player.force then
-            objects[#objects + 1] = rendering.draw_circle {
+            local area = garage_area(garage.position)
+
+            objects[#objects + 1] = rendering.draw_rectangle {
                 color = preview_colour,
-                radius = shared.garage.radius,
                 filled = true,
-                target = garage,
+                left_top = area[1],
+                right_bottom = area[2],
                 surface = surface,
                 players = { player },
+                draw_on_ground = true,
             }
-            objects[#objects + 1] = rendering.draw_circle {
+            objects[#objects + 1] = rendering.draw_rectangle {
                 color = preview_border,
-                radius = shared.garage.radius,
                 width = 3,
-                target = garage,
+                left_top = area[1],
+                right_bottom = area[2],
                 surface = surface,
                 players = { player },
             }

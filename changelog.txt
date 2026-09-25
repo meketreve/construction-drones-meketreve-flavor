@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.10.0
+Date: 2026-09-24
+  Changes:
+    - The area a garage covers is a square of tiles, the way a roboport covers a square, instead of a circle. The
+      corners of the square count now, and the drawing on the ground matches what the garage actually reaches.
+    - Garages join into one network when the areas they cover touch, like roboports do, instead of by a distance
+      of their own. A garage in the middle chains two that do not touch each other, and the whole network shares
+      its drones and the chests wired to any of its garages.
+---------------------------------------------------------------------------------------------------
 Version: 1.9.0
 Date: 2026-09-24
   Features:

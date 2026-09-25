@@ -238,9 +238,11 @@ schedule_new_searches = function(event_tick)
     -- Garages look around themselves, which is how the drones work with nobody nearby
     for _, garage in pairs(get_all_garages()) do
         if can_player_spawn_drones(garage) and not next(data.job_queue[owner_key(garage)] or {}) then
+            local reach = shared.garage.radius
             for i, area in pairs(search_offsets) do
-                -- Only the areas that fall inside the garage own radius
-                if distance(area[1], { 0, 0 }) <= shared.garage.radius then
+                -- Only the search areas that overlap the square the garage covers
+                if area[1][1] < reach and area[2][1] > -reach
+                    and area[1][2] < reach and area[2][2] > -reach then
                     insert(queue, { garage = garage, area_index = i })
                 end
             end
