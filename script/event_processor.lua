@@ -16,6 +16,14 @@ remote.add_interface("construction_drone", {
     console = function(bool)
         use_console = bool
     end,
+    -- How many garage antennas are being drawn, one per garage. Debugging only.
+    antennas = function()
+        local count = 0
+        for _, antenna in pairs(data.garage_antennas or {}) do
+            if antenna and antenna.valid then count = count + 1 end
+        end
+        return count
+    end,
     -- What the garages are doing: how many there are, what they have queued and how many drones they may send.
     garage_state = function()
         local report = {}

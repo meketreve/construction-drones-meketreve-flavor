@@ -4,9 +4,8 @@ local technology_name = shared.technologies.drone_garage
 
 local graphics = util.path("data/entities/graphics/")
 
--- The sprite is drawn at 64 pixels per tile, so it is placed at half scale. Its footprint centre sits 28 pixels
--- below the middle of the canvas, hence the shift.
-local antenna_shift = { 0, -1.65625 }
+-- The sprites are drawn at 64 pixels per tile, so they are placed at half scale. The footprint centre of the
+-- building sits 32 pixels below the middle of its canvas, hence the shift on the picture.
 
 -- A steel chest to start from, because it already carries a circuit connector and the wire reach, which is the
 -- whole point of the garage: the chests you wire to it are what the drones may take from.
@@ -45,23 +44,24 @@ garage.picture = {
             width = 256,
             height = 256,
             scale = 0.5,
-            shift = { 0, -0.4375 },
+            shift = { 0, -0.5 },
         },
     },
 }
 
--- The antenna spins on its own, drawn over the garage by the control stage
+-- The antenna turning on the roof is the roboport one, drawn over the garage by the control stage, since a
+-- container prototype can only hold a still picture.
 local antenna = {
     type = "animation",
     name = name .. "-antenna",
-    filename = graphics .. "drone_garage_antenna.png",
-    width = 160,
-    height = 160,
-    frame_count = 24,
-    line_length = 6,
+    filename = "__base__/graphics/entity/roboport/roboport-base-animation.png",
+    priority = "medium",
+    width = 83,
+    height = 59,
+    frame_count = 8,
+    animation_speed = 0.5,
     scale = 0.5,
-    animation_speed = 0.4,
-    shift = antenna_shift,
+    shift = { 0, -0.48 },
 }
 
 local item = util.copy(data.raw.item["steel-chest"])

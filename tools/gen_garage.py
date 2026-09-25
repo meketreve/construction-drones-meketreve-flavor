@@ -1,196 +1,188 @@
-"""Generates the drone garage sprites: a 3x3 platform plus a rotating antenna animation."""
+"""Draws the drone garage: a masonry building in the game's own palette, 3x3 tiles.
+
+The antenna on the roof is not drawn here, the mod borrows the roboport one from the base game.
+Run this from the mod root to overwrite the sprites in data/entities/graphics/.
+"""
 import math
+import random
 from PIL import Image, ImageDraw, ImageFilter
 
-OUT = "/mnt/SSD/git-projeto/factorio_construction_drones/Construction_Drones/data/entities/graphics/"
+OUT = "data/entities/graphics/"
 
-STEEL_DARK = (52, 56, 62)
-STEEL = (92, 98, 106)
-STEEL_LIGHT = (140, 148, 158)
-STEEL_HIGH = (186, 194, 202)
-RUST = (104, 84, 66)
+SIZE = 256
+TILE = 64                      # high resolution, the sprite is drawn at half scale
+FOOT = 3 * TILE                # a three by three footprint
+CENTER = (128, 160)            # where the entity position falls on the canvas
+WALL_H = 86                    # how tall the brick wall stands
+ROOF_H = 118                   # the roof is foreshortened, the game looks at buildings from an angle
+
+CONCRETE = (140, 137, 127)
+CONCRETE_LIGHT = (176, 172, 161)
+CONCRETE_DARK = (88, 85, 78)
+CONCRETE_DEEP = (58, 56, 51)
+BRICK = (152, 112, 92)
+BRICK_DARK = (102, 72, 58)
+MORTAR = (112, 106, 96)
+METAL = (122, 126, 132)
+METAL_DARK = (74, 78, 84)
+HAZARD = (214, 163, 32)
 ACCENT = (86, 200, 230)
-ACCENT_DIM = (44, 120, 148)
 
-BASE_SIZE = 256          # canvas of the static platform, high res (64 px per tile)
-FOOT = 192               # 3 tiles
-CENTER = (128, 156)      # where the structure sits on the canvas
+random.seed(7)
 
 
-def bevel_polygon(draw, points, fill, light, dark, width=3):
-    draw.polygon(points, fill=fill)
-    n = len(points)
-    for i in range(n):
-        a, b = points[i], points[(i + 1) % n]
-        # edges facing up/left catch the light
-        up = (a[1] + b[1]) / 2 < sum(p[1] for p in points) / n
-        draw.line([a, b], fill=light if up else dark, width=width)
+def footprint():
+    cx, cy = CENTER
+    return [cx - FOOT / 2, cy - FOOT / 2, cx + FOOT / 2, cy + FOOT / 2]
 
 
-def iso_ellipse(draw, cx, cy, rx, ry, **kw):
-    draw.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], **kw)
+def brick_wall(draw, box, rows=7):
+    """Masonry: staggered courses, each brick shaded a little differently."""
+    x0, y0, x1, y1 = box
+    draw.rectangle(box, fill=MORTAR)
+    height = (y1 - y0) / rows
+    for row in range(rows):
+        top = y0 + row * height
+        bottom = top + height - 2
+        offset = 0 if row % 2 == 0 else -18
+        x = x0 + offset
+        while x < x1:
+            bx0, bx1 = max(x0, x + 2), min(x1, x + 34)
+            if bx1 - bx0 > 3:
+                shade = random.randint(-14, 14)
+                fill = tuple(max(0, min(255, c + shade)) for c in BRICK)
+                draw.rectangle([bx0, top, bx1, bottom], fill=fill)
+                draw.line([(bx0, top), (bx1, top)], fill=tuple(min(255, c + 22) for c in fill))
+                draw.line([(bx0, bottom), (bx1, bottom)], fill=BRICK_DARK)
+            x += 36
 
 
-def draw_leg(draw, cx, cy, dx, dy, length, width):
-    """A short strut under the deck edge, with a foot pad on the ground."""
-    ex, ey = cx + dx * length, cy + dy * length * 0.55
-    draw.line([(cx, cy), (ex, ey)], fill=(34, 37, 42), width=width + 3)
-    draw.line([(cx, cy), (ex, ey)], fill=(76, 82, 90), width=width)
-    iso_ellipse(draw, ex, ey + 2, width * 1.5, width * 0.7, fill=(30, 33, 37))
-    iso_ellipse(draw, ex, ey + 1, width * 1.2, width * 0.5, fill=(88, 94, 102))
+def roof_slab(draw, box):
+    x0, y0, x1, y1 = box
+    draw.rectangle(box, fill=CONCRETE)
+    # panel seams
+    for i in range(1, 4):
+        x = x0 + (x1 - x0) * i / 4
+        draw.line([(x, y0 + 6), (x, y1 - 6)], fill=CONCRETE_DARK, width=2)
+    for i in range(1, 3):
+        y = y0 + (y1 - y0) * i / 3
+        draw.line([(x0 + 6, y), (x1 - 6, y)], fill=CONCRETE_DARK, width=2)
+    # speckle, so the concrete is not flat
+    for _ in range(900):
+        x, y = random.uniform(x0 + 2, x1 - 2), random.uniform(y0 + 2, y1 - 2)
+        shade = random.randint(-10, 12)
+        draw.point((x, y), fill=tuple(max(0, min(255, c + shade)) for c in CONCRETE))
+    # parapet: a raised lip all around, lit from the top left
+    draw.rectangle(box, outline=CONCRETE_DEEP, width=5)
+    draw.rectangle([x0 + 2, y0 + 2, x1 - 2, y1 - 2], outline=CONCRETE_LIGHT, width=2)
+    draw.line([(x0 + 3, y1 - 3), (x1 - 3, y1 - 3)], fill=CONCRETE_DARK, width=3)
+    draw.line([(x1 - 3, y0 + 3), (x1 - 3, y1 - 3)], fill=CONCRETE_DARK, width=3)
 
 
-def octagon(cx, cy, rx, ry):
-    pts = []
-    for i in range(8):
-        a = math.pi / 8 + i * math.pi / 4
-        pts.append((cx + rx * math.cos(a), cy + ry * math.sin(a)))
-    return pts
+def rivets(draw, box, step=22):
+    x0, y0, x1, y1 = box
+    for x in range(int(x0) + 10, int(x1) - 6, step):
+        for y in (y0 + 8, y1 - 8):
+            draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=CONCRETE_LIGHT)
+            draw.point((x, y - 1), fill=(210, 206, 198))
+
+
+def garage_door(draw, box):
+    """A roll up door: dark recess, slats, a metal frame and hazard paint on the threshold."""
+    x0, y0, x1, y1 = box
+    draw.rectangle([x0 - 4, y0 - 4, x1 + 4, y1], fill=METAL_DARK)
+    draw.rectangle([x0 - 2, y0 - 2, x1 + 2, y1], fill=METAL)
+    draw.rectangle(box, fill=(38, 40, 44))
+    slat = 7
+    y = y0 + 3
+    while y < y1 - 4:
+        draw.rectangle([x0 + 3, y, x1 - 3, y + slat - 2], fill=(64, 67, 72))
+        draw.line([(x0 + 3, y), (x1 - 3, y)], fill=(88, 92, 98))
+        y += slat
+    # the opening at the bottom, where the drones come out
+    draw.rectangle([x0 + 3, y1 - 12, x1 - 3, y1], fill=(24, 25, 28))
+    draw.line([(x0 + 3, y1 - 12), (x1 - 3, y1 - 12)], fill=(12, 13, 15), width=2)
+    for i in range(3):
+        lx = x0 + 14 + i * ((x1 - x0 - 28) / 2)
+        draw.ellipse([lx - 3, y1 - 9, lx + 3, y1 - 5], fill=ACCENT)
+
+
+def hazard_strip(draw, box):
+    x0, y0, x1, y1 = box
+    draw.rectangle(box, fill=HAZARD)
+    for x in range(int(x0) - 20, int(x1) + 20, 16):
+        draw.polygon([(x, y1), (x + 8, y1), (x + 8 + 10, y0), (x + 10, y0)], fill=(38, 34, 28))
+    draw.rectangle(box, outline=(70, 56, 20))
 
 
 def make_base():
-    img = Image.new("RGBA", (BASE_SIZE, BASE_SIZE), (0, 0, 0, 0))
-    cx, cy = CENTER
-    rx, ry = FOOT * 0.46, FOOT * 0.25
-    deck = octagon(cx, cy, rx, ry)
-    wall_h = 18
+    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    fx0, fy0, fx1, fy1 = footprint()
+    # the roof sits above the wall and is squashed, the wall below it is what the player mostly sees
+    roof = [fx0, fy1 - WALL_H - ROOF_H, fx1, fy1 - WALL_H]
 
-    # soft ground shadow
-    shadow = Image.new("RGBA", (BASE_SIZE, BASE_SIZE), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).polygon([(x + 6, y + wall_h + 4) for x, y in deck], fill=(0, 0, 0, 110))
-    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(9)))
+    # shadow, thrown to the lower right like every building in the game
+    shadow = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rectangle([fx0 + 12, roof[1] + 16, fx1 + 16, fy1 + 4], fill=(0, 0, 0, 110))
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(8)))
 
     d = ImageDraw.Draw(img)
 
-    # side wall: the lower silhouette of the deck, extruded down
-    lower = [p for p in deck if p[1] >= cy - 1]
-    lower.sort(key=lambda p: p[0])
-    wall = [(x, y + wall_h) for x, y in reversed(lower)]
-    d.polygon(lower + wall, fill=(40, 43, 48))
-    for x, y in lower[1:-1]:
-        d.line([(x, y), (x, y + wall_h)], fill=(52, 56, 62), width=2)
+    # front wall, from the roof line down to the bottom of the footprint
+    wall = [fx0, roof[3], fx1, fy1]
+    brick_wall(d, wall)
+    d.rectangle(wall, outline=CONCRETE_DEEP, width=3)
 
-    # deck plate
-    d.polygon(deck, fill=STEEL)
-    d.line(deck + [deck[0]], fill=STEEL_DARK, width=3)
+    # concrete pillars at the corners of the wall
+    for x in (fx0, fx1 - 16):
+        d.rectangle([x, roof[3], x + 16, fy1], fill=CONCRETE)
+        d.line([(x + 1, roof[3]), (x + 1, fy1)], fill=CONCRETE_LIGHT, width=2)
+        d.line([(x + 15, roof[3]), (x + 15, fy1)], fill=CONCRETE_DARK, width=2)
+
+    door_w, door_h = 92, WALL_H - 24
+    door = [CENTER[0] - door_w / 2, fy1 - door_h - 6, CENTER[0] + door_w / 2, fy1 - 6]
+    garage_door(d, door)
+    hazard_strip(d, [fx0 + 18, fy1 - 8, fx1 - 18, fy1 - 1])
+
+    # the roof overhangs a little, so the top of the wall sits in its shadow
+    shade = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    ImageDraw.Draw(shade).rectangle([fx0, roof[3], fx1, roof[3] + 16], fill=(0, 0, 0, 120))
+    img.alpha_composite(shade.filter(ImageFilter.GaussianBlur(5)))
+
+    # roof slab on top of the wall
+    roof_slab(d, roof)
+    rivets(d, roof)
+
+    # a vent box and a crate, so the roof is not empty
+    d.rectangle([roof[0] + 14, roof[1] + 14, roof[0] + 52, roof[1] + 40], fill=CONCRETE_DARK)
+    d.rectangle([roof[0] + 18, roof[1] + 18, roof[0] + 48, roof[1] + 36], fill=METAL)
+    for i in range(3):
+        y = roof[1] + 21 + i * 5
+        d.line([(roof[0] + 20, y), (roof[0] + 46, y)], fill=METAL_DARK)
+
+    d.rectangle([roof[2] - 54, roof[3] - 34, roof[2] - 18, roof[3] - 12], fill=CONCRETE_DARK)
+    d.rectangle([roof[2] - 50, roof[3] - 30, roof[2] - 22, roof[3] - 16], fill=CONCRETE_LIGHT)
+
+    # the mount the antenna stands on, in the middle of the roof
+    mx, my = CENTER[0], roof[1] + (roof[3] - roof[1]) * 0.62
+    d.rectangle([mx - 26, my - 16, mx + 26, my + 18], fill=CONCRETE_DARK)
+    d.rectangle([mx - 22, my - 12, mx + 22, my + 14], fill=CONCRETE)
+    d.rectangle([mx - 22, my - 12, mx + 22, my - 6], fill=CONCRETE_LIGHT)
     for i in range(4):
-        a, b = deck[i], deck[i + 1]
-        d.line([a, b], fill=STEEL_HIGH, width=2)
-
-    # plating grooves
-    for i in range(8):
-        a = math.pi / 8 + i * math.pi / 4
-        d.line([(cx + rx * 0.34 * math.cos(a), cy + ry * 0.34 * math.sin(a)),
-                (cx + rx * 0.94 * math.cos(a), cy + ry * 0.94 * math.sin(a))],
-               fill=(72, 77, 84), width=2)
-    d.polygon(octagon(cx, cy, rx * 0.34, ry * 0.34), fill=(78, 84, 92), outline=(58, 62, 68))
-
-    # drone bays on the front wall
-    for ox in (-52, 0, 52):
-        x0, y0 = cx + ox - 19, cy + ry * 0.62
-        d.rounded_rectangle([x0, y0, x0 + 38, y0 + 21], radius=4, fill=(34, 37, 42))
-        d.rounded_rectangle([x0 + 3, y0 + 3, x0 + 35, y0 + 13], radius=3, fill=(84, 90, 98))
-        d.line([(x0 + 5, y0 + 17), (x0 + 33, y0 + 17)], fill=ACCENT_DIM, width=2)
-
-    # short struts holding the deck up, at the two front corners
-    for dx in (-1, 1):
-        draw_leg(d, cx + dx * rx * 0.80, cy + ry * 0.36 + wall_h, dx * 0.5, 1, 26, 8)
-
-    # central hub
-    iso_ellipse(d, cx, cy - 14, 36, 21, fill=(44, 47, 52))
-    iso_ellipse(d, cx, cy - 17, 31, 18, fill=STEEL)
-    iso_ellipse(d, cx, cy - 19, 23, 13, fill=STEEL_LIGHT)
-    iso_ellipse(d, cx, cy - 20, 16, 9, fill=(64, 69, 76))
-    for i in range(6):
-        a = i * math.pi / 3 + 0.3
-        iso_ellipse(d, cx + 29 * math.cos(a), cy - 16 + 16 * math.sin(a), 3, 2, fill=ACCENT)
-
-    # mast
-    d.rectangle([cx - 8, cy - 68, cx + 8, cy - 18], fill=(42, 45, 50))
-    d.rectangle([cx - 6, cy - 68, cx + 3, cy - 18], fill=STEEL)
-    d.rectangle([cx - 6, cy - 68, cx - 3, cy - 18], fill=STEEL_LIGHT)
-    for y in range(int(cy) - 70, int(cy) - 22, 13):
-        d.line([(cx - 8, y), (cx + 8, y)], fill=(38, 41, 46), width=2)
-    iso_ellipse(d, cx, cy - 68, 10, 6, fill=STEEL_LIGHT)
+        lx = mx - 18 + i * 12
+        d.ellipse([lx - 2, my + 6, lx + 2, my + 10], fill=ACCENT)
 
     img.save(OUT + "drone_garage_base.png")
     return img
 
 
-FRAMES = 24
-FRAME = 160
-FCENTER = (80, 118)      # the mast top inside a frame
-
-
-def draw_dish(d, cx, cy, angle):
-    """A dish on a yoke, spinning around the mast. Facing the camera it shows its inside."""
-    facing = math.cos(angle)          # 1 = towards the viewer, -1 = away
-    side = math.sin(angle)
-    reach = 26
-
-    # yoke arm from the mast towards the dish
-    ax, ay = cx + side * reach * 0.55, cy - 4 + facing * 6
-    d.line([(cx, cy), (ax, ay)], fill=STEEL_DARK, width=7)
-    d.line([(cx, cy - 1), (ax, ay - 1)], fill=STEEL, width=4)
-
-    rx = 30 * (0.30 + 0.70 * abs(side)) if False else 30
-    # the dish flattens when it points at or away from the camera is wrong for a horizontal
-    # spin: it flattens when seen edge on, which happens at side == +-1
-    rx = 30 * (0.34 + 0.66 * abs(facing))
-    ry = 21
-
-    box = [ax - rx, ay - ry, ax + rx, ay + ry]
-    if facing >= 0:
-        # inside of the dish, lit
-        d.ellipse(box, fill=(70, 76, 84), outline=STEEL_DARK, width=3)
-        inner = [ax - rx * 0.72, ay - ry * 0.72, ax + rx * 0.72, ay + ry * 0.72]
-        d.ellipse(inner, fill=(96, 104, 114), outline=(58, 63, 70), width=2)
-        d.ellipse([ax - rx * 0.3, ay - ry * 0.3, ax + rx * 0.3, ay + ry * 0.3],
-                  fill=ACCENT_DIM)
-        # feed horn on struts, in front of the dish
-        fx, fy = ax + side * 4, ay + 13
-        d.line([(ax - rx * 0.6, ay), (fx, fy)], fill=STEEL_DARK, width=2)
-        d.line([(ax + rx * 0.6, ay), (fx, fy)], fill=STEEL_DARK, width=2)
-        d.ellipse([fx - 4, fy - 4, fx + 4, fy + 4], fill=STEEL_LIGHT, outline=STEEL_DARK)
-    else:
-        # back of the dish, a plain shell with ribs
-        d.ellipse(box, fill=STEEL, outline=STEEL_DARK, width=3)
-        d.ellipse([ax - rx * 0.55, ay - ry * 0.55, ax + rx * 0.55, ay + ry * 0.55],
-                  fill=(74, 80, 88), outline=(58, 63, 70), width=2)
-        d.line([(ax - rx, ay), (ax + rx, ay)], fill=(64, 69, 76), width=2)
-
-    # a blinking tip light, brighter when the dish faces us
-    glow = int(120 + 135 * max(0.0, facing))
-    d.ellipse([ax - 3, ay - ry - 6, ax + 3, ay - ry], fill=(glow, 60, 60))
-
-
-def make_animation():
-    cols, rows = 6, 4
-    sheet = Image.new("RGBA", (FRAME * cols, FRAME * rows), (0, 0, 0, 0))
-    for i in range(FRAMES):
-        frame = Image.new("RGBA", (FRAME, FRAME), (0, 0, 0, 0))
-        d = ImageDraw.Draw(frame)
-        angle = 2 * math.pi * i / FRAMES
-        cx, cy = FCENTER
-        # bearing on top of the mast
-        d.ellipse([cx - 11, cy - 7, cx + 11, cy + 7], fill=STEEL_DARK)
-        d.ellipse([cx - 8, cy - 6, cx + 8, cy + 3], fill=STEEL)
-        draw_dish(d, cx, cy - 4, angle)
-        sheet.alpha_composite(frame, (FRAME * (i % cols), FRAME * (i // cols)))
-    sheet.save(OUT + "drone_garage_antenna.png")
-    return sheet
-
-
 def make_icon(base):
     icon = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-    shot = base.crop((16, 40, 240, 264)).resize((236, 236), Image.LANCZOS)
-    icon.alpha_composite(shot, (10, 10))
-    d = ImageDraw.Draw(icon)
-    draw_dish(d, 128, 92, math.pi * 0.15)
+    crop = base.crop((28, 46, 228, 246)).resize((240, 240), Image.LANCZOS)
+    icon.alpha_composite(crop, (8, 8))
     icon.resize((64, 64), Image.LANCZOS).save(OUT + "drone_garage_icon.png")
 
 
 base = make_base()
-anim = make_animation()
 make_icon(base)
 print("ok")
